@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="LedgerLite.Api/LedgerLite.Api.csproj" />
+  <Project Path="LedgerLite.Application.Tests/LedgerLite.Application.Tests.csproj" />
+  <Project Path="LedgerLite.Application/LedgerLite.Application.csproj" />
+  <Project Path="LedgerLite.Contracts/LedgerLite.Contracts.csproj" />
+  <Project Path="LedgerLite.Data/LedgerLite.Data.csproj" />
+  <Project Path="LedgerLite.Domain.Tests/LedgerLite.Domain.Tests.csproj" />
+  <Project Path="LedgerLite.Domain/LedgerLite.Domain.csproj" />
+  <Project Path="LedgerLite.Web/LedgerLite.Web.csproj" />
+</Solution>

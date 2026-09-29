@@ -1,0 +1,15 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<BitButton IconName="@BitIconName.Add">Click me</BitButton>
+
+<BitTextField Label="Your name" Placeholder="Name" @bind-Value="name" />
+
+<BitDatePicker Label="Pick a date" />
+
+<BitToggle Label="Notifications" DefaultValue="true" />
+
+@code {
+    private string? name;
+}

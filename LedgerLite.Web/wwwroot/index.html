@@ -7,10 +7,9 @@
     <title>LedgerLite.Web</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <link href="LedgerLite.Web.styles.css" rel="stylesheet" />
+    <link href="_content/Bit.BlazorUI/styles/bit.blazorui.css" rel="stylesheet" />
     <script type="importmap"></script>
 </head>
 
@@ -28,6 +27,9 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/Bit.BlazorUI/scripts/bit.blazorui.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

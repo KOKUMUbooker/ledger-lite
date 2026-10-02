@@ -1,3 +1,5 @@
+using LedgerLite.Data;
+
 namespace LedgerLite.Api;
 
 public class Program
@@ -10,6 +12,8 @@ public class Program
         // Add services to the container.
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
+
+        builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);
 
         var app = builder.Build();
 

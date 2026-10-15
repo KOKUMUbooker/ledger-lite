@@ -185,6 +185,17 @@ public class JournalEntryTests
     }
 
     [Fact]
+    public void CreateReversal_OfAReversal_Throws()
+    {
+        var original = ValidDeposit();
+        SetId(original, 4471);
+        var reversal = original.CreateReversal(Today);
+        SetId(reversal, 4472);
+
+        Assert.Throws<InvalidJournalEntryException>(() => reversal.CreateReversal(Today));
+    }
+
+    [Fact]
     public void CreateReversal_SetsReversalSource()
     {
         var original = ValidDeposit();

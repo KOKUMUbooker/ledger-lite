@@ -34,6 +34,9 @@ public class JournalEntry
         if (Id == 0)
             throw new InvalidJournalEntryException("Only a saved entry can be reversed.");
 
+        if (ReversalOfEntryId is not null)
+            throw new InvalidJournalEntryException("A reversal cannot itself be reversed. Post a new entry instead.");
+
         return Build(
             date,
             description ?? $"Reversal of #{Id}: {Description}",

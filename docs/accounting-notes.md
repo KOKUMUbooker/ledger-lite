@@ -25,7 +25,13 @@ Debit and credit are not "money in" and "money out". They are the left and right
 | Income       | Interest Income       | Decrease | Increase | Credit         |
 | Expense      | Interest Expense      | Increase | Decrease | Debit          |
 
-**Normal balance** is the side that increases the account. An account with a normal balance on the opposite side is unusual and worth investigating (for example, a Cash account with a credit balance).
+**Normal balance** is the side on which an account's balance is normally positive, which is the same side that increases it. An account whose balance sits on the opposite side is unusual and worth investigating.
+
+Example: Cash is debit-normal. If debits total 5,000 and credits total 2,000, Cash has a debit balance of 3,000, which is healthy. If credits ever exceeded debits, Cash would have a credit balance, meaning more cash was paid out than ever came in, so something is wrong. Customer Deposits is the mirror image: a credit balance is normal (the bank owes depositors), and a debit balance would be unusual.
+
+Normal balance describes an account's usual state. It is not a rule each transaction must follow, and an account can briefly go abnormal (for example, a customer overpays a loan, so Loan Receivable has a credit balance). The system allows it and it is flagged for investigation.
+
+It matters because it picks the balance formula (section 3), acts as a quick sanity check, and decides which trial balance column an account's balance appears in.
 
 ### Memory aid
 
@@ -47,22 +53,24 @@ In code: `Account.BalanceFrom(totalDebits, totalCredits)`.
 
 ## 4. Key terms
 
-| Term                         | Meaning                                                                                                      | In LedgerLite                 |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| Chart of accounts            | The list of all accounts the books can post to                                                               | `Account` table               |
-| Account                      | A bucket that tracks one kind of value (cash, deposits owed, interest earned)                                | `Account`                     |
-| Journal entry                | One financial event, recorded as a set of balanced movements                                                 | `JournalEntry`                |
-| Journal line                 | One account affected by one event, on the debit or credit side                                               | `JournalLine`                 |
-| Posting                      | Recording a journal entry in the ledger                                                                      | `PostJournalEntry` use case   |
-| Ledger                       | All the lines for one account, in date order, with a running balance                                         | Account ledger view           |
-| Trial balance                | Total debits and credits across all accounts; the two totals must match                                      | Trial balance report          |
-| Reversal                     | A new entry that cancels an earlier one by flipping debits and credits                                       | `JournalEntry.CreateReversal` |
-| Control account              | A parent account that rolls up many sub-accounts (e.g. Customer Deposits over each member's savings account) | `Account.ParentAccountId`     |
-| Sub-ledger account           | A child account for one customer or product, under a control account                                         | Stage 2                       |
-| Suspense account             | A holding account for money received but not yet allocated                                                   | Stage 2                       |
-| Accrual                      | Recording income or expense when it is earned or owed, not when cash moves                                   | Stage 2 interest accrual      |
-| Accounting date vs posted-at | The date the event belongs to vs the moment it was recorded                                                  | `Date` vs `PostedAt`          |
-| Idempotency key              | A unique key that stops a retried job from posting the same entry twice                                      | `JournalEntry.IdempotencyKey` |
+| Term                         | Meaning                                                                                                                                                                                                       | In LedgerLite                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Chart of accounts            | The list of all accounts the books can post to                                                                                                                                                                | `Account` table                                               |
+| Account                      | A bucket that tracks one kind of value (cash, deposits owed, interest earned)                                                                                                                                 | `Account`                                                     |
+| Journal entry                | One financial event (the whole transaction), made up of two or more lines that balance                                                                                                                        | `JournalEntry`                                                |
+| Journal line                 | One account's part of a journal entry: an amount on the debit or credit side of a single account. Like a line item on a receipt, it only has meaning as part of its entry                                     | `JournalLine`                                                 |
+| Posting                      | Validating a journal entry and saving it permanently, so it counts in every account it touches                                                                                                                | `PostJournalEntry` use case                                   |
+| Posting rules                | The logic that decides _which lines_ a business transaction produces (e.g. a cash deposit = debit Cash, credit the customer's account)                                                                        | Stage 2 use cases such as `DepositCash`; see section 10       |
+| Ledger                       | The permanent record of every movement, viewed by account: one account's lines in date order with a running balance. The "general ledger" is all accounts together. Stored once, as journal entries and lines | `JournalEntries` + `JournalLines` tables; account ledger view |
+| Normal balance               | The side (debit or credit) on which an account's balance is normally positive; the same side that increases it                                                                                                | `AccountType.IsDebitNormal()`                                 |
+| Trial balance                | Total debits and credits across all accounts; the two totals must match                                                                                                                                       | Trial balance report                                          |
+| Reversal                     | A new entry that cancels an earlier one by flipping debits and credits                                                                                                                                        | `JournalEntry.CreateReversal`                                 |
+| Control account              | A parent account that rolls up many sub-accounts (e.g. Customer Deposits over each member's savings account)                                                                                                  | `Account.ParentAccountId`                                     |
+| Sub-ledger account           | A child account for one customer or product, under a control account                                                                                                                                          | Stage 2                                                       |
+| Suspense account             | A holding account for money received but not yet allocated                                                                                                                                                    | Stage 2                                                       |
+| Accrual                      | Recording income or expense when it is earned or owed, not when cash moves                                                                                                                                    | Stage 2 interest accrual                                      |
+| Accounting date vs posted-at | The date the event belongs to vs the moment it was recorded                                                                                                                                                   | `Date` vs `PostedAt`                                          |
+| Idempotency key              | A unique key that stops a retried job from posting the same entry twice                                                                                                                                       | `JournalEntry.IdempotencyKey`                                 |
 
 ## 5. Rules LedgerLite enforces
 
@@ -175,3 +183,56 @@ Both entries stay in the ledger. Their effects cancel out, and the audit trail i
 3. Did each one go up or down?
 4. Using the table in section 2, is each change a debit or a credit?
 5. Do total debits equal total credits? If not, a side is missing.
+
+## 10. Posting vs posting rules
+
+These are two different layers, and it is easy to mix them up.
+
+|                                 | Posting                                                                                    | Posting rules                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Question it answers             | "Is this set of lines valid, and can it be saved safely?"                                  | "Which lines does this business transaction produce?"                            |
+| Where it lives                  | `PostJournalEntry` (Stage 1, built)                                                        | One small class per transaction type (Stage 2, planned)                          |
+| Example                         | Reject an unbalanced entry; reject an inactive account; refuse a duplicate idempotency key | A cash deposit of X means: debit Cash X, credit the customer's deposit account X |
+| Knows about deposits and loans? | No. It only sees accounts, debits, and credits                                             | Yes                                                                              |
+
+The worked examples in section 7 are posting rules. Each one is a recipe for turning a business event into lines. `PostJournalEntry` takes the lines that a rule produced and records them safely.
+
+```
+Stage 2 business operation              Stage 1 ledger engine
+(decides WHAT the lines are)       →    (records them safely)
+
+DepositCash(5000)     ─┐
+WithdrawCash(2000)    ─┤
+DisburseLoan(10000)   ─┼──→ builds lines ──→ PostJournalEntry ──→ saved
+RepayLoan(1100)       ─┤
+BuyShares(3000)       ─┘
+```
+
+Example of a posting rule in code (Stage 2):
+
+```csharp
+public class DepositCash
+{
+    private readonly PostJournalEntry _post;
+    public DepositCash(PostJournalEntry post) => _post = post;
+
+    public Task<PostJournalEntryResult> ExecuteAsync(int customerAccountId, decimal amount, string reference)
+    {
+        // Posting rule for a cash deposit: Dr Cash, Cr the customer's deposit account
+        var lines = new[]
+        {
+            new PostLine(CashAccountId, Debit: amount, Credit: 0),
+            new PostLine(customerAccountId, Debit: 0, Credit: amount)
+        };
+        return _post.ExecuteAsync(new PostJournalEntryCommand(Today, "Cash deposit", reference, lines));
+    }
+}
+```
+
+Why keep them separate:
+
+- Balance checks, account checks, and idempotency are written once, in `PostJournalEntry`, and every transaction type gets them for free.
+- A new transaction type is a new small class, with no change to the ledger engine.
+- Stage 1 exposes the raw "post these lines" operation on purpose, so you can type debits and credits yourself and see why they must balance.
+
+Loan repayment (7.4) is not a plain if-condition. Its posting rule also needs the principal and interest split from the loan schedule, which is the interesting part of Stage 2.

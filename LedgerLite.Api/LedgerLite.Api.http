@@ -1,6 +1,77 @@
-@LedgerLite.Api_HostAddress = http://localhost:5059
+@host = https://localhost:7001
+# Seeded accounts: 1 Cash, 2 Loan Receivable, 3 Customer Deposits, 4 Share Capital, 5 Interest Income, 6 Interest Expense
 
-GET {{LedgerLite.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### List accounts
+GET {{host}}/api/accounts
 
-###
+### List only liabilities
+GET {{host}}/api/accounts?type=Liability
+
+### Create a sub-account under Customer Deposits (parent must be the same type)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2001", "name": "Jane Wanjiru - Savings 00123", "type": "Liability", "parentAccountId": 3 }
+
+### Post a deposit: Dr Cash 5000, Cr Customer Deposits 5000  (expect 201)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Cash deposit - Jane Wanjiru",
+  "reference": "DEP-00123-20261016",
+  "idempotencyKey": "dep-00123-20261016-001",
+  "lines": [
+    { "accountId": 1, "debit": 5000, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 5000 }
+  ]
+}
+
+### Send the same request again (expect 200, same entry id, nothing new posted)
+
+### Unbalanced entry (expect 400, code "UnbalancedEntry")
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Broken entry",
+  "reference": "BAD-1",
+  "lines": [
+    { "accountId": 1, "debit": 5000, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 4999 }
+  ]
+}
+
+### Unknown account (expect 404)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Ghost account",
+  "reference": "BAD-2",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 0 },
+    { "accountId": 999, "debit": 0, "credit": 100 }
+  ]
+}
+
+### Get an entry (use the id from the first post)
+GET {{host}}/api/journal-entries/1
+
+### Reverse it (expect 201; doing it twice gives 409)
+POST {{host}}/api/journal-entries/1/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-16" }
+
+### Cash ledger with running balance
+GET {{host}}/api/accounts/1/ledger
+
+### Trial balance
+GET {{host}}/api/reports/trial-balance
+
+### Trial balance as of a date
+GET {{host}}/api/reports/trial-balance?asOf=2026-10-15

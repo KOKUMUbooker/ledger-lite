@@ -14,6 +14,8 @@ public static class DependencyInjection
         services.AddScoped<ReverseJournalEntry>();
         services.AddScoped<GetAccountLedger>();
         services.AddScoped<GetTrialBalance>();
+        services.AddScoped<ListAccounts>();
+        services.AddScoped<GetJournalEntry>();
         return services;
     }
 }

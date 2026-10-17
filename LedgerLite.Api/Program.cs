@@ -1,4 +1,5 @@
 using LedgerLite.Data;
+using LedgerLite.Application;
 
 namespace LedgerLite.Api;
 
@@ -14,6 +15,8 @@ public class Program
         builder.Services.AddOpenApi();
 
         builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);
+
+        builder.Services.AddLedgerApplication();
 
         var app = builder.Build();
 

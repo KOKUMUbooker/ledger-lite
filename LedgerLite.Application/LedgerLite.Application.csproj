@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\LedgerLite.Domain\LedgerLite.Domain.csproj" />
     <ProjectReference Include="..\LedgerLite.Data\LedgerLite.Data.csproj" />
   </ItemGroup>

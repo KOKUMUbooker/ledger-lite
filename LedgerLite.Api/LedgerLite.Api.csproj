@@ -1,23 +1,28 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+	<!--This forces the API to discover, copy, map, and serve the _framework/ files and your Bit.BlazorUI assets from the referenced LedgerLite.Web project -->
+	<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets> 
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LedgerLite.Application\LedgerLite.Application.csproj" />
     <ProjectReference Include="..\LedgerLite.Data\LedgerLite.Data.csproj" />
     <ProjectReference Include="..\LedgerLite.Contracts\LedgerLite.Contracts.csproj" />
+    <ProjectReference Include="..\LedgerLite.Web\LedgerLite.Web.csproj" />
   </ItemGroup>
 
 </Project>

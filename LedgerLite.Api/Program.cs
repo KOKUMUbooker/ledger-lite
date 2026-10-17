@@ -19,12 +19,7 @@ public class Program
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<LedgerExceptionHandler>();
 
-        // Blazor WASM runs on a different origin, so the browser needs CORS permission
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-        builder.Services.AddCors(options =>
-            options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
-
-        builder.Services.AddOpenApi();   // keep the template's own OpenAPI registration if it differs
+        builder.Services.AddOpenApi();
 
         var app = builder.Build();
 
@@ -32,13 +27,22 @@ public class Program
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi();            // keep the template's own OpenAPI mapping if it differs
+            app.MapOpenApi();
         }
 
         app.UseHttpsRedirection();
-        app.UseCors();
+
+        // Serve the Blazor WASM client (_framework files, then wwwroot and static web assets such as Bit's)
+        app.UseBlazorFrameworkFiles();
+        app.UseStaticFiles();
 
         app.MapControllers();
+
+        // Unknown /api/... URLs must stay a real 404, not fall through to index.html
+        app.Map("/api/{**path}", () => Results.NotFound());
+
+        // Any other URL (e.g. /accounts/5/ledger) belongs to the Blazor router
+        app.MapFallbackToFile("index.html");
 
         app.Run();
     }

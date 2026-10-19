@@ -1,0 +1,216 @@
+﻿@page "/reports/trial-balance"
+@implements IDisposable
+@using System.Globalization
+@inject LedgerApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Trial balance · LedgerLite</PageTitle>
+
+<PageHeader Title="Trial balance" Subtitle="@Subtitle" />
+
+<ErrorBanner @bind-Message="_error" />
+
+<div class="filter-bar">
+    <div class="filter-field">
+        <BitDatePicker @bind-Value="_asOf"
+                       @bind-Value:after="LoadAsync"
+                       Label="As of"
+                       Placeholder="All dates"
+                       Culture="CultureInfo.InvariantCulture"
+                       DateFormat="yyyy-MM-dd"
+                       AllowTextInput="true" />
+    </div>
+    <BitButton Variant="BitVariant.Text" IsEnabled="_asOf is not null" OnClick="ClearDate">Latest</BitButton>
+    <BitCheckbox @bind-Value="_hideEmpty" Label="Hide accounts with no activity" />
+</div>
+
+@if (_data is null)
+{
+    if (_loading)
+    {
+        <LoadingIndicator Text="Loading trial balance…" />
+    }
+    else
+    {
+        <BitButton Variant="BitVariant.Outline" OnClick="LoadAsync">Try again</BitButton>
+    }
+}
+else
+{
+    var assets = TypeTotal("Asset");
+    var liabilities = TypeTotal("Liability");
+    var equity = TypeTotal("Equity");
+    var netIncome = TypeTotal("Income") - TypeTotal("Expense");
+
+    <div class="@(_loading ? "reloading" : "")">
+        <div class="tb-status">
+            <BalancedBadge IsBalanced="_data.IsBalanced"
+                           Difference="@(_data.GrandTotalDebits - _data.GrandTotalCredits)" />
+        </div>
+
+        <div class="stat-row">
+            @foreach (var type in TypeOrder)
+            {
+                <div class="stat">
+                    <div class="stat-label">@Plural(type)</div>
+                    <div class="stat-value">@Fmt.Money(TypeTotal(type))</div>
+                </div>
+            }
+        </div>
+
+        <p class="equation">
+            Assets <strong>@Fmt.Money(assets)</strong>
+            = Liabilities <strong>@Fmt.Money(liabilities)</strong>
+            + Equity <strong>@Fmt.Money(equity)</strong>
+            + Net income <strong>@Fmt.Money(netIncome)</strong>
+            @(assets == liabilities + equity + netIncome ? "✓" : "✗")
+        </p>
+
+        @if (_data.Rows.Count == 0)
+        {
+            <p class="empty-state">There are no accounts yet.</p>
+        }
+        else if (!AnyVisible)
+        {
+            <p class="empty-state">No accounts have activity yet. Post an entry, or untick "Hide accounts with no activity".</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Account</th>
+                            <th class="num">Debits</th>
+                            <th class="num">Credits</th>
+                            <th class="num">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var type in TypeOrder)
+                        {
+                            var rows = _data.Rows.Where(r => r.Type == type && IsVisible(r)).ToList();
+
+                            if (rows.Count > 0)
+                            {
+                                <tr class="group-row">
+                                    <td colspan="2"><AccountTypeBadge Type="@type" /></td>
+                                    <td class="num">@Fmt.Money(rows.Sum(r => r.TotalDebits))</td>
+                                    <td class="num">@Fmt.Money(rows.Sum(r => r.TotalCredits))</td>
+                                    <td class="num">@Fmt.Money(rows.Sum(r => r.Balance))</td>
+                                </tr>
+
+                                @foreach (var row in rows)
+                                {
+                                    <tr class="clickable" @onclick="() => OpenLedger(row.AccountId)">
+                                        <td class="mono">
+                                            <a href="/accounts/@row.AccountId/ledger" @onclick:stopPropagation="true">@row.Code</a>
+                                        </td>
+                                        <td>@row.Name</td>
+                                        <td class="num">@Fmt.Money(row.TotalDebits)</td>
+                                        <td class="num">@Fmt.Money(row.TotalCredits)</td>
+                                        <td class="num @(row.Balance < 0 ? "abnormal" : "")"
+                                            title="@(row.Balance < 0 ? "Unusual: this balance is on the opposite side to the account's normal balance." : null)">
+                                            @Fmt.Money(row.Balance)
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">Total</td>
+                            <td class="num">@Fmt.Money(_data.GrandTotalDebits)</td>
+                            <td class="num">@Fmt.Money(_data.GrandTotalCredits)</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly string[] TypeOrder = { "Asset", "Liability", "Equity", "Income", "Expense" };
+
+    private TrialBalanceDto? _data;
+    private DateTimeOffset? _asOf;
+    private bool _hideEmpty;
+    private bool _loading = true;
+    private string? _error;
+    private CancellationTokenSource? _cts;
+
+    private string Subtitle =>
+        _data is null ? string.Empty
+        : _data.AsOf is { } date ? $"Balances as of {Fmt.Date(date)}"
+        : "All postings to date";
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        // If the date changes quickly, abandon the older request
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        var cts = _cts;
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            DateOnly? asOf = _asOf is { } picked ? DateOnly.FromDateTime(picked.Date) : null;
+            var result = await Api.GetTrialBalanceAsync(asOf, cts.Token);
+
+            if (!cts.IsCancellationRequested)
+                _data = result;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (ApiException ex)
+        {
+            if (!cts.IsCancellationRequested)
+                _error = ex.Message;
+        }
+        finally
+        {
+            if (_cts == cts)
+                _loading = false;
+        }
+    }
+
+    private async Task ClearDate()
+    {
+        _asOf = null;
+        await LoadAsync();
+    }
+
+    private decimal TypeTotal(string type) =>
+        _data is null ? 0m : _data.Rows.Where(r => r.Type == type).Sum(r => r.Balance);
+
+    private bool IsVisible(TrialBalanceRowDto row) =>
+        !_hideEmpty || row.TotalDebits != 0 || row.TotalCredits != 0;
+
+    private bool AnyVisible => _data is not null && _data.Rows.Any(IsVisible);
+
+    private static string Plural(string type) => type switch
+    {
+        "Asset" => "Assets",
+        "Liability" => "Liabilities",
+        "Expense" => "Expenses",
+        _ => type
+    };
+
+    private void OpenLedger(int accountId) => Navigation.NavigateTo($"/accounts/{accountId}/ledger");
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

@@ -1,0 +1,112 @@
+﻿@using System.Globalization
+@inject LedgerApiClient Api
+
+<BitModal IsOpen="IsOpen" IsOpenChanged="IsOpenChanged" Blocking="true">
+    <div class="reverse-dialog">
+        <h2>Reverse entry #@Entry.Id</h2>
+        <p class="muted">
+            This posts a <strong>new</strong> entry with every debit and credit flipped. The original stays in the
+            ledger untouched, and the two cancel out. An entry can only be reversed once.
+        </p>
+
+        <ErrorBanner @bind-Message="_error" />
+
+        <table class="data-table compact">
+            <thead>
+                <tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var line in Entry.Lines)
+                {
+                    <tr>
+                        <td>@AccountLabel(line.AccountId)</td>
+                        @* Flipped: the original credit becomes the reversal's debit, and the other way round *@
+                        <td class="num">@Fmt.MoneyOrBlank(line.Credit)</td>
+                        <td class="num">@Fmt.MoneyOrBlank(line.Debit)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="reverse-fields">
+            <BitDatePicker @bind-Value="_date"
+                           Label="Accounting date of the reversal"
+                           Culture="CultureInfo.InvariantCulture"
+                           DateFormat="yyyy-MM-dd"
+                           AllowTextInput="true" />
+
+            <BitTextField @bind-Value="_description"
+                          Label="Description (optional)"
+                          Placeholder="@DefaultDescription"
+                          MaxLength="500"
+                          Immediate />
+        </div>
+
+        <div class="form-actions">
+            <BitButton Variant="BitVariant.Outline" IsEnabled="!_saving" OnClick="Close">Cancel</BitButton>
+            <BitButton Color="BitColor.Primary" IsEnabled="_date is not null" IsLoading="_saving" OnClick="Submit">
+                Post reversal
+            </BitButton>
+        </div>
+    </div>
+</BitModal>
+
+@code {
+    [Parameter, EditorRequired] public JournalEntryDto Entry { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyDictionary<int, AccountDto> Accounts { get; set; } = default!;
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<JournalEntryDto> OnReversed { get; set; }
+
+    private DateTimeOffset? _date;
+    private string? _description;
+    private string? _error;
+    private bool _saving;
+    private bool _wasOpen;
+
+    private string DefaultDescription => $"Reversal of entry #{Entry.Id}";
+
+    protected override void OnParametersSet()
+    {
+        // Start fresh every time the dialog opens
+        if (IsOpen && !_wasOpen)
+        {
+            _date = DateTimeOffset.Now;
+            _description = null;
+            _error = null;
+        }
+        _wasOpen = IsOpen;
+    }
+
+    private string AccountLabel(int id) =>
+        Accounts.TryGetValue(id, out var a) ? $"{a.Code} · {a.Name}" : $"Account {id}";
+
+    private Task Close() => _saving ? Task.CompletedTask : IsOpenChanged.InvokeAsync(false);
+
+    private async Task Submit()
+    {
+        if (_date is null || _saving) return;
+
+        _error = null;
+        _saving = true;
+        try
+        {
+            var description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim();
+            var request = new ReverseEntryRequest(DateOnly.FromDateTime(_date.Value.Date), description);
+
+            var reversal = await Api.ReverseEntryAsync(Entry.Id, request);
+
+            await IsOpenChanged.InvokeAsync(false);
+            await OnReversed.InvokeAsync(reversal);
+        }
+        catch (ApiException ex)
+        {
+            // For example 409: the entry was already reversed from another tab or by someone else
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

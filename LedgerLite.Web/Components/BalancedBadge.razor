@@ -1,0 +1,13 @@
+﻿@if (IsBalanced)
+{
+    <span class="status-badge status-ok">✓ Balanced</span>
+}
+else
+{
+    <span class="status-badge status-bad">✗ Out of balance by @Fmt.Money(Math.Abs(Difference))</span>
+}
+
+@code {
+    [Parameter] public bool IsBalanced { get; set; }
+    [Parameter] public decimal Difference { get; set; }
+}

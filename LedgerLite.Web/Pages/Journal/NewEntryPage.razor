@@ -1,0 +1,394 @@
+﻿@page "/journal/new"
+@using System.Globalization
+@inject LedgerApiClient Api
+
+<PageTitle>New entry · LedgerLite</PageTitle>
+
+<PageHeader Title="New journal entry" Subtitle="Record one financial event. Total debits must equal total credits." />
+
+@if (_postedId is not null)
+{
+    <BitMessage Color="BitColor.Success" OnDismiss="DismissNotice">
+        @(_wasDuplicate ? "This entry had already been posted." : "Entry posted.")
+        <a href="/journal/@_postedId">View entry #@_postedId</a>
+    </BitMessage>
+}
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Loading accounts…" />
+}
+else if (_accountsLoaded && _accounts.Count == 0)
+{
+    <p class="empty-state">There are no active accounts yet. <a href="/accounts">Create an account</a> first.</p>
+}
+else if (_accountsLoaded)
+{
+    <div class="entry-header">
+        <BitDatePicker @bind-Value="_date"
+                       Label="Date"
+                       Culture="CultureInfo.InvariantCulture"
+                       DateFormat="yyyy-MM-dd"
+                       AllowTextInput="true" />
+
+        <BitTextField @bind-Value="_reference"
+                      Label="Reference"
+                      Placeholder="e.g. DEP-00123-20261018"
+                      Required
+                      MaxLength="100"
+                      Immediate />
+
+        <div class="wide">
+            <BitTextField @bind-Value="_description"
+                          Label="Description"
+                          Placeholder="e.g. Cash deposit - Jane Wanjiru"
+                          Required
+                          MaxLength="500"
+                          Immediate />
+        </div>
+    </div>
+
+    <h2 class="section-title">Lines</h2>
+
+    <div class="line-head">
+        <div>Account</div>
+        <div>Debit</div>
+        <div>Credit</div>
+        <div>Effect</div>
+        <div></div>
+    </div>
+
+    @foreach (var line in _lines)
+    {
+        <div class="line-row">
+            <div class="line-account">
+                <BitDropdown TItem="BitDropdownItem<int?>" TValue="int?"
+                             Items="_accountItems"
+                             @bind-Value="line.AccountId"
+                             Placeholder="Choose account"
+                             ShowSearchBox="true"
+                             SearchBoxPlaceholder="Search by code or name" />
+            </div>
+
+            <div class="amount-field">
+                <BitTextField @bind-Value="line.Debit"
+                              @bind-Value:after="() => OnDebitChanged(line)"
+                              Placeholder="0.00"
+                              Immediate
+                              ErrorMessage="@AmountError(line.Debit)" />
+            </div>
+
+            <div class="amount-field">
+                <BitTextField @bind-Value="line.Credit"
+                              @bind-Value:after="() => OnCreditChanged(line)"
+                              Placeholder="0.00"
+                              Immediate
+                              ErrorMessage="@AmountError(line.Credit)" />
+            </div>
+
+            <div class="line-effect">@EffectText(line)</div>
+
+            <div>
+                <BitButton Variant="BitVariant.Text"
+                           IsEnabled="_lines.Count > 2"
+                           OnClick="() => RemoveLine(line)">Remove</BitButton>
+            </div>
+        </div>
+    }
+
+    <div class="line-actions">
+        <BitButton Variant="BitVariant.Outline" IconName="Add" OnClick="AddLine">Add line</BitButton>
+        @if (TotalDebits != TotalCredits)
+        {
+            <BitButton Variant="BitVariant.Text" OnClick="AddBalancingLine">Add balancing line</BitButton>
+        }
+    </div>
+
+    <div class="totals-bar @(Balanced ? "ok" : "")">
+        <span>Debits <strong>@Fmt.Money(TotalDebits)</strong></span>
+        <span>Credits <strong>@Fmt.Money(TotalCredits)</strong></span>
+        <span>Difference <strong>@Fmt.Money(Math.Abs(TotalDebits - TotalCredits))</strong></span>
+        <span class="totals-state">@(Balanced ? "✓ Balanced" : "Not balanced")</span>
+    </div>
+
+    <ul class="checklist">
+        <li class="@(HasHeader ? "done" : "")">@Mark(HasHeader) Date, reference and description are filled in</li>
+        <li class="@(LinesValid ? "done" : "")">@Mark(LinesValid) At least two lines, each with an account and one valid amount</li>
+        <li class="@(Balanced ? "done" : "")">@Mark(Balanced) Debits equal credits</li>
+        <p class="muted">New to debits and credits? <a href="/how-it-works">See how it works</a>.</p>
+    </ul>
+
+    <div class="form-actions">
+        <BitButton Variant="BitVariant.Outline" IsEnabled="!_saving" OnClick="ClearForm">Clear</BitButton>
+        <BitButton Color="BitColor.Primary" IsEnabled="CanPost" IsLoading="_saving" OnClick="Post">Post entry</BitButton>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery] public string? Example { get; set; }
+    private sealed class LineModel
+    {
+        public int? AccountId { get; set; }
+        public string? Debit { get; set; }
+        public string? Credit { get; set; }
+
+        public bool IsEmpty =>
+            (AccountId is null or <= 0) && string.IsNullOrWhiteSpace(Debit) && string.IsNullOrWhiteSpace(Credit);
+    }
+
+    private List<AccountDto> _accounts = new();
+    private Dictionary<int, AccountDto> _accountsById = new();
+    private List<BitDropdownItem<int?>> _accountItems = new();
+
+    private DateTimeOffset? _date;
+    private string? _reference;
+    private string? _description;
+    private List<LineModel> _lines = new();
+
+    private string? _error;
+    private int? _postedId;
+    private bool _wasDuplicate;
+    private bool _loading = true;
+    private bool _accountsLoaded;
+    private bool _saving;
+
+    // Retrying the same entry (for example after a network timeout) reuses one key, so it can only post once.
+    // Changing the content gets a fresh key.
+    private string _idempotencyKey = string.Empty;
+    private string? _lastSignature;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ApplyExample();
+        ResetForm(keepDate: false);
+
+        try
+        {
+            var all = await Api.ListAccountsAsync();
+            _accounts = all.Where(a => a.IsActive).OrderBy(a => a.Code).ToList();
+            _accountsById = _accounts.ToDictionary(a => a.Id);
+            _accountItems = _accounts
+                .Select(a => new BitDropdownItem<int?> { Text = $"{a.Code} · {a.Name}", Value = a.Id })
+                .ToList();
+            _accountsLoaded = true;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // ---- Form state ----
+
+    private void ResetForm(bool keepDate)
+    {
+        if (!keepDate || _date is null) _date = DateTimeOffset.Now;
+        _reference = null;
+        _description = null;
+        _lines = new() { new LineModel(), new LineModel() };
+        _idempotencyKey = NewKey();
+        _lastSignature = null;
+    }
+
+    private static string NewKey() => Guid.NewGuid().ToString("N");
+
+    private void ClearForm()
+    {
+        ResetForm(keepDate: false);
+        _error = null;
+        _postedId = null;
+    }
+
+    private void DismissNotice() => _postedId = null;
+
+    private void AddLine() => _lines.Add(new LineModel());
+
+    private void RemoveLine(LineModel line)
+    {
+        if (_lines.Count > 2) _lines.Remove(line);
+    }
+
+    // A line has a debit or a credit, never both: typing in one clears the other
+    private void OnDebitChanged(LineModel line)
+    {
+        if (!string.IsNullOrWhiteSpace(line.Debit)) line.Credit = null;
+    }
+
+    private void OnCreditChanged(LineModel line)
+    {
+        if (!string.IsNullOrWhiteSpace(line.Credit)) line.Debit = null;
+    }
+
+    // Puts the missing amount on the opposite side, on an empty line if there is one
+    private void AddBalancingLine()
+    {
+        var difference = TotalDebits - TotalCredits;
+        if (difference == 0) return;
+
+        var line = _lines.FirstOrDefault(l => l.IsEmpty);
+        if (line is null)
+        {
+            line = new LineModel();
+            _lines.Add(line);
+        }
+
+        var amount = Math.Abs(difference).ToString("0.00", CultureInfo.InvariantCulture);
+        if (difference > 0) line.Credit = amount; else line.Debit = amount;
+    }
+
+    // ---- Parsing and checks (the server still decides; this is only so the form can guide you) ----
+
+    private static bool TryAmount(string? text, out decimal value)
+    {
+        value = 0m;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        var cleaned = text.Trim().Replace(",", string.Empty);
+        if (!decimal.TryParse(cleaned, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value))
+            return false;
+
+        return value > 0 && decimal.Round(value, 2) == value;
+    }
+
+    private static decimal AmountOf(string? text) => TryAmount(text, out var value) ? value : 0m;
+
+    private static string? AmountError(string? text) =>
+        !string.IsNullOrWhiteSpace(text) && !TryAmount(text, out _)
+            ? "Positive amount, max 2 decimals"
+            : null;
+
+    private decimal TotalDebits => _lines.Sum(l => AmountOf(l.Debit));
+    private decimal TotalCredits => _lines.Sum(l => AmountOf(l.Credit));
+    private bool Balanced => TotalDebits == TotalCredits && TotalDebits > 0;
+
+    private bool HasHeader =>
+        _date is not null
+        && !string.IsNullOrWhiteSpace(_reference)
+        && !string.IsNullOrWhiteSpace(_description);
+
+    private static bool LineIsValid(LineModel line) =>
+        line.AccountId is > 0 &&
+        ((TryAmount(line.Debit, out _) && string.IsNullOrWhiteSpace(line.Credit)) ||
+         (TryAmount(line.Credit, out _) && string.IsNullOrWhiteSpace(line.Debit)));
+
+    private bool LinesValid
+    {
+        get
+        {
+            var filled = _lines.Where(l => !l.IsEmpty).ToList();
+            return filled.Count >= 2 && filled.All(LineIsValid);
+        }
+    }
+
+    private bool CanPost => HasHeader && LinesValid && Balanced && !_saving;
+
+    private static string Mark(bool ok) => ok ? "✓" : "○";
+
+    // Says in words what the line does to its account. The normal balance comes from the server.
+    private string EffectText(LineModel line)
+    {
+        if (line.AccountId is not > 0 || !_accountsById.TryGetValue(line.AccountId.Value, out var account))
+            return string.Empty;
+
+        string side;
+        if (TryAmount(line.Debit, out _)) side = "Debit";
+        else if (TryAmount(line.Credit, out _)) side = "Credit";
+        else return string.Empty;
+
+        var increases = side == account.NormalBalance;
+        return $"{(increases ? "↑" : "↓")} {account.Name} {(increases ? "increases" : "decreases")}";
+    }
+
+    // Pre-fills the form from the "How it works" page. Quietly does nothing if an example account is missing.
+    private void ApplyExample()
+    {
+        int? IdOf(string code) => _accounts.FirstOrDefault(a => a.Code == code)?.Id;
+
+        var cash = IdOf("1000");
+        var loans = IdOf("1200");
+        var deposits = IdOf("2000");
+        var interest = IdOf("4000");
+
+        switch (Example?.ToLowerInvariant())
+        {
+            case "deposit" when cash is not null && deposits is not null:
+                _reference = "EXAMPLE-DEPOSIT";
+                _description = "Cash deposit (example)";
+                _lines = new()
+            {
+                new LineModel { AccountId = cash, Debit = "5000.00" },
+                new LineModel { AccountId = deposits, Credit = "5000.00" }
+            };
+                break;
+
+            case "repayment" when cash is not null && loans is not null && interest is not null:
+                _reference = "EXAMPLE-REPAYMENT";
+                _description = "Loan repayment: 1000 principal + 100 interest (example)";
+                _lines = new()
+            {
+                new LineModel { AccountId = cash, Debit = "1100.00" },
+                new LineModel { AccountId = loans, Credit = "1000.00" },
+                new LineModel { AccountId = interest, Credit = "100.00" }
+            };
+                break;
+        }
+    }
+
+    // ---- Posting ----
+
+    private async Task Post()
+    {
+        if (!CanPost) return;
+
+        _error = null;
+        _postedId = null;
+
+        var lines = _lines
+            .Where(l => !l.IsEmpty)
+            .Select(l => new PostLineRequest(l.AccountId!.Value, AmountOf(l.Debit), AmountOf(l.Credit)))
+            .ToList();
+
+        var request = new PostEntryRequest(
+            DateOnly.FromDateTime(_date!.Value.Date),
+            _description!.Trim(),
+            _reference!.Trim(),
+            lines);
+
+        var signature = Signature(request);
+        if (signature != _lastSignature)
+        {
+            _idempotencyKey = NewKey();
+            _lastSignature = signature;
+        }
+
+        request = request with { IdempotencyKey = _idempotencyKey };
+
+        _saving = true;
+        try
+        {
+            var result = await Api.PostEntryAsync(request);
+            _postedId = result.Entry.Id;
+            _wasDuplicate = result.WasDuplicate;
+            ResetForm(keepDate: true);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string Signature(PostEntryRequest request) =>
+        string.Join('|',
+            new[] { Fmt.Date(request.Date), request.Description, request.Reference }
+                .Concat(request.Lines.Select(l => $"{l.AccountId}:{l.Debit}:{l.Credit}")));
+}

@@ -1,0 +1,198 @@
+﻿@page "/journal"
+@using System.Globalization
+@implements IDisposable
+@inject LedgerApiClient Api
+
+<PageTitle>Journal · LedgerLite</PageTitle>
+
+<PageHeader Title="Journal" Subtitle="Every posted entry, newest first.">
+    <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+</PageHeader>
+
+<div class="filters">
+    <BitDatePicker @bind-Value="_from"
+                   Label="From"
+                   Culture="CultureInfo.InvariantCulture"
+                   DateFormat="yyyy-MM-dd"
+                   AllowTextInput="true" />
+
+    <BitDatePicker @bind-Value="_to"
+                   Label="To"
+                   Culture="CultureInfo.InvariantCulture"
+                   DateFormat="yyyy-MM-dd"
+                   AllowTextInput="true" />
+
+    <div class="filter-actions">
+        <BitButton Color="BitColor.Primary" IsEnabled="!_rangeInvalid" OnClick="ApplyFilter">Apply</BitButton>
+        <BitButton Variant="BitVariant.Outline" IsEnabled="@(_from is not null || _to is not null || _appliedFrom is not null || _appliedTo is not null)" OnClick="ClearFilter">Clear</BitButton>
+    </div>
+</div>
+
+@if (_rangeInvalid)
+{
+    <p class="field-error">"From" must not be after "To".</p>
+}
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading && _page is null)
+{
+    <LoadingIndicator Text="Loading journal…" />
+}
+else if (_page is not null)
+{
+    @if (_page.Items.Count == 0)
+    {
+        <p class="empty-state">
+            @(_appliedFrom is null && _appliedTo is null
+                ? "No entries have been posted yet."
+                : "No entries in this date range.")
+            <a href="/journal/new">Post an entry</a>
+        </p>
+    }
+    else
+    {
+        <table class="data-table @(_loading ? "reloading" : "")">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Reference</th>
+                    <th>Description</th>
+                    <th class="num">Lines</th>
+                    <th class="num">Total</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in _page.Items)
+                {
+                    <tr>
+                        <td><a href="/journal/@e.Id">#@e.Id</a></td>
+                        <td>@Fmt.Date(e.Date)</td>
+                        <td>@e.Reference</td>
+                        <td>@e.Description</td>
+                        <td class="num">@e.LineCount</td>
+                        <td class="num">@Fmt.Money(e.Total)</td>
+                        <td>
+                            @if (e.ReversalOfEntryId is not null)
+                            {
+                                <span class="status-badge info">Reversal of <a href="/journal/@e.ReversalOfEntryId">#@e.ReversalOfEntryId</a></span>
+                            }
+                            else if (e.ReversedByEntryId is not null)
+                            {
+                                <span class="status-badge warn">Reversed by <a href="/journal/@e.ReversedByEntryId">#@e.ReversedByEntryId</a></span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="pager">
+            <span class="muted">
+                Showing @FirstShown–@LastShown of @_page.TotalCount
+            </span>
+            <div class="pager-buttons">
+                <BitButton Variant="BitVariant.Outline" IsEnabled="@(_pageNumber > 1 && !_loading)" OnClick="PreviousPage">Previous</BitButton>
+                <span>Page @_pageNumber of @TotalPages</span>
+                <BitButton Variant="BitVariant.Outline" IsEnabled="@(_pageNumber < TotalPages && !_loading)" OnClick="NextPage">Next</BitButton>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private const int PageSize = 20;
+
+    // What the user is editing, vs what the list is currently filtered by
+    private DateTimeOffset? _from;
+    private DateTimeOffset? _to;
+    private DateOnly? _appliedFrom;
+    private DateOnly? _appliedTo;
+
+    private PagedResultDto<JournalEntrySummaryDto>? _page;
+    private int _pageNumber = 1;
+    private string? _error;
+    private bool _loading;
+    private CancellationTokenSource? _cts;
+
+    private bool _rangeInvalid => _from is not null && _to is not null && _from.Value.Date > _to.Value.Date;
+
+    private int TotalPages => _page is null ? 1 : Math.Max(1, (int)Math.Ceiling(_page.TotalCount / (double)PageSize));
+    private int FirstShown => _page is null || _page.Items.Count == 0 ? 0 : (_pageNumber - 1) * PageSize + 1;
+    private int LastShown => FirstShown == 0 ? 0 : FirstShown + _page!.Items.Count - 1;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        // A newer request supersedes an older one, so a slow response can't overwrite a fresh one
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var result = await Api.ListEntriesAsync(_appliedFrom, _appliedTo, _pageNumber, PageSize, token);
+            if (token.IsCancellationRequested) return;
+            _page = result;
+        }
+        catch (OperationCanceledException)
+        {
+            // superseded by a newer request
+        }
+        catch (ApiException ex)
+        {
+            if (!token.IsCancellationRequested) _error = ex.Message;
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested) _loading = false;
+        }
+    }
+
+    private Task ApplyFilter()
+    {
+        if (_rangeInvalid) return Task.CompletedTask;
+
+        _appliedFrom = _from is null ? null : DateOnly.FromDateTime(_from.Value.Date);
+        _appliedTo = _to is null ? null : DateOnly.FromDateTime(_to.Value.Date);
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task ClearFilter()
+    {
+        _from = null;
+        _to = null;
+        _appliedFrom = null;
+        _appliedTo = null;
+        _pageNumber = 1;
+        return LoadAsync();
+    }
+
+    private Task PreviousPage()
+    {
+        if (_pageNumber <= 1) return Task.CompletedTask;
+        _pageNumber--;
+        return LoadAsync();
+    }
+
+    private Task NextPage()
+    {
+        if (_pageNumber >= TotalPages) return Task.CompletedTask;
+        _pageNumber++;
+        return LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

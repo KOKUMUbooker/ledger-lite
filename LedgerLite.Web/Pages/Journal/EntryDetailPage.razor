@@ -1,0 +1,180 @@
+﻿@page "/journal/{Id:int}"
+@implements IDisposable
+@inject LedgerApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Entry #@Id · LedgerLite</PageTitle>
+
+<nav class="breadcrumb">
+    <a href="/journal">Journal</a> <span>/</span> <span>Entry #@Id</span>
+</nav>
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Loading entry…" />
+}
+else if (_entry is not null)
+{
+    <PageHeader Title="@($"Entry #{_entry.Id}")" Subtitle="@_entry.Description">
+        @if (CanReverse)
+        {
+            <BitButton Variant="BitVariant.Outline" IconName="Undo" OnClick="OpenReverse">Reverse</BitButton>
+        }
+    </PageHeader>
+
+    @if (_notice is not null)
+    {
+        <BitMessage Color="BitColor.Success" OnDismiss="() => _notice = null">@_notice</BitMessage>
+    }
+
+    @if (_entry.ReversedByEntryId is not null)
+    {
+        <BitMessage Color="BitColor.Warning">
+            This entry was reversed by <a href="/journal/@_entry.ReversedByEntryId">entry #@_entry.ReversedByEntryId</a>.
+            Its effect on the accounts has been cancelled out.
+        </BitMessage>
+    }
+
+    @if (_entry.ReversalOfEntryId is not null)
+    {
+        <BitMessage Color="BitColor.Info">
+            This entry reverses <a href="/journal/@_entry.ReversalOfEntryId">entry #@_entry.ReversalOfEntryId</a>.
+            A reversal cannot itself be reversed. Post a new entry instead.
+        </BitMessage>
+    }
+
+    <dl class="detail-grid">
+        <div><dt>Accounting date</dt><dd>@Fmt.Date(_entry.Date)</dd></div>
+        <div><dt>Posted at</dt><dd>@_entry.PostedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</dd></div>
+        <div><dt>Reference</dt><dd>@_entry.Reference</dd></div>
+        <div><dt>Source</dt><dd>@_entry.Source</dd></div>
+    </dl>
+
+    <h2 class="section-title">Lines</h2>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Account</th>
+                <th class="num">Debit</th>
+                <th class="num">Credit</th>
+                <th>Effect</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var line in _entry.Lines)
+            {
+                <tr>
+                    <td>
+                        @if (_accounts.TryGetValue(line.AccountId, out var account))
+                        {
+                            <a href="/accounts/@account.Id/ledger">@account.Code · @account.Name</a>
+                        }
+                        else
+                        {
+                            <span>Account @line.AccountId</span>
+                        }
+                    </td>
+                    <td class="num">@Fmt.MoneyOrBlank(line.Debit)</td>
+                    <td class="num">@Fmt.MoneyOrBlank(line.Credit)</td>
+                    <td class="muted">@EffectText(line)</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th>Totals</th>
+                <th class="num">@Fmt.Money(_entry.Lines.Sum(l => l.Debit))</th>
+                <th class="num">@Fmt.Money(_entry.Lines.Sum(l => l.Credit))</th>
+                <th><BalancedBadge IsBalanced="Balanced" /></th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <ReverseEntryDialog Entry="_entry"
+                        Accounts="_accounts"
+                        @bind-IsOpen="_reverseOpen"
+                        OnReversed="HandleReversed" />
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private JournalEntryDto? _entry;
+    private Dictionary<int, AccountDto> _accounts = new();
+    private string? _error;
+    private string? _notice;
+    private bool _loading = true;
+    private bool _reverseOpen;
+    private int _loadedId;
+    private CancellationTokenSource? _cts;
+
+    private bool CanReverse => _entry is { ReversalOfEntryId: null, ReversedByEntryId: null };
+    private bool Balanced => _entry is not null && _entry.Lines.Sum(l => l.Debit) == _entry.Lines.Sum(l => l.Credit);
+
+    // The same component instance is reused when you move from /journal/12 to /journal/13
+    // (for example after reversing), so reload whenever Id changes
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id == _loadedId) return;
+        _loadedId = Id;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _loading = true;
+        _error = null;
+        _entry = null;
+
+        try
+        {
+            var entryTask = Api.GetEntryAsync(Id);
+            var accountsTask = Api.ListAccountsAsync();
+            await Task.WhenAll(entryTask, accountsTask);
+
+            if (token.IsCancellationRequested) return;
+
+            _entry = entryTask.Result;
+            _accounts = accountsTask.Result.ToDictionary(a => a.Id);
+        }
+        catch (ApiException ex)
+        {
+            if (!token.IsCancellationRequested) _error = ex.Message; // for example 404: no such entry
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested) _loading = false;
+        }
+    }
+
+    private string EffectText(JournalLineDto line)
+    {
+        if (!_accounts.TryGetValue(line.AccountId, out var account)) return string.Empty;
+
+        var side = line.Debit > 0 ? "Debit" : "Credit";
+        var increases = side == account.NormalBalance;
+        return $"{(increases ? "↑" : "↓")} {account.Name} {(increases ? "increases" : "decreases")}";
+    }
+
+    private void OpenReverse() => _reverseOpen = true;
+
+    private void HandleReversed(JournalEntryDto reversal)
+    {
+        // Go to the new reversal entry. Its page shows "This entry reverses #N" with a link back.
+        Nav.NavigateTo($"/journal/{reversal.Id}");
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

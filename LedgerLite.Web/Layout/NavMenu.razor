@@ -1,0 +1,12 @@
+﻿<BitNav Items="_items" />
+
+@code {
+    private readonly List<BitNavItem> _items = new()
+    {
+        new() { Text = "Dashboard",     IconName = "Home",         Url = "/",                    Match = BitNavMatch.Exact },
+        new() { Text = "Accounts",      IconName = "BulletedList", Url = "/accounts",            Match = BitNavMatch.Prefix },
+        new() { Text = "Journal",       IconName = "Financial",    Url = "/journal",             Match = BitNavMatch.Prefix },
+        new() { Text = "Trial balance", IconName = "Calculator",   Url = "/reports/trial-balance", Match = BitNavMatch.Prefix },
+        new() { Text = "How it works", IconName = "Info", Url = "/how-it-works", Match = BitNavMatch.Exact }
+    };
+}

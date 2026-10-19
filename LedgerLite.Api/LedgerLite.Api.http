@@ -1,19 +1,88 @@
-@host = https://localhost:7001
-# Seeded accounts: 1 Cash, 2 Loan Receivable, 3 Customer Deposits, 4 Share Capital, 5 Interest Income, 6 Interest Expense
+@host = http://localhost:5059
 
-### List accounts
+# =====================================================================
+# LedgerLite API requests
+#
+# Seeded accounts: 1 Cash, 2 Loan Receivable, 3 Customer Deposits,
+#                  4 Share Capital, 5 Interest Income, 6 Interest Expense
+#
+# Error responses are ProblemDetails JSON with a "code" field. Mapping:
+#   400 bad input / domain rule broken     404 not found
+#   409 conflict (duplicate, already done) 422 business rule
+# Where I'm not certain of the exact status, the comment says "expect 4xx".
+#
+# Run top to bottom on a fresh database for the cleanest results. Requests
+# that depend on an earlier one say so. Rerunnable ones use {{$guid}} keys.
+# =====================================================================
+
+
+# =====================================================================
+# 1. ACCOUNTS
+# =====================================================================
+
+### List all accounts (the chart of accounts, ordered by code)
 GET {{host}}/api/accounts
 
-### List only liabilities
+### List only one type (Asset, Liability, Equity, Income, Expense)
 GET {{host}}/api/accounts?type=Liability
 
-### Create a sub-account under Customer Deposits (parent must be the same type)
+### Invalid type filter (expect 4xx, "Foo" is not an account type)
+GET {{host}}/api/accounts?type=Foo
+
+### Create a sub-account under Customer Deposits (expect 201)
+# The parent must have the same type. Code must be unique, so a second run
+# of this request fails with 409 (see the duplicate request below).
+# @name createAccount
 POST {{host}}/api/accounts
 Content-Type: application/json
 
 { "code": "2001", "name": "Jane Wanjiru - Savings 00123", "type": "Liability", "parentAccountId": 3 }
 
-### Post a deposit: Dr Cash 5000, Cr Customer Deposits 5000  (expect 201)
+### Create a top-level account with no parent (expect 201, or 409 if it exists)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "1100", "name": "Mobile Money Float", "type": "Asset", "parentAccountId": null }
+
+### Duplicate code (expect 409). Run the sub-account request above first
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2001", "name": "Some other name", "type": "Liability", "parentAccountId": 3 }
+
+### Parent of a different type (expect 4xx: Cash is an Asset, this is a Liability)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2002", "name": "Wrong parent type", "type": "Liability", "parentAccountId": 1 }
+
+### Unknown parent account (expect 4xx, no account 999)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2003", "name": "Orphan", "type": "Liability", "parentAccountId": 999 }
+
+### Missing name (expect 400, validation problem)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2004", "name": "", "type": "Liability", "parentAccountId": null }
+
+### Invalid account type (expect 400)
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "2005", "name": "Bad type", "type": "Banana", "parentAccountId": null }
+
+
+# =====================================================================
+# 2. POSTING JOURNAL ENTRIES
+# =====================================================================
+
+### Post a deposit: Dr Cash 5000, Cr Customer Deposits 5000 (expect 201)
+# Run this once. If you run it again, the fixed idempotency key makes it a
+# replay, which is the next request's lesson. Change the key to post a new one.
+# @name deposit
 POST {{host}}/api/journal-entries
 Content-Type: application/json
 
@@ -28,9 +97,126 @@ Content-Type: application/json
   ]
 }
 
-### Send the same request again (expect 200, same entry id, nothing new posted)
+### Send the SAME request again (expect 200, same entry id, nothing new posted)
+# Same idempotency key means it is a retry. The server returns the original
+# entry instead of posting a duplicate. 201 = newly created, 200 = replay.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Cash deposit - Jane Wanjiru",
+  "reference": "DEP-00123-20261016",
+  "idempotencyKey": "dep-00123-20261016-001",
+  "lines": [
+    { "accountId": 1, "debit": 5000, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 5000 }
+  ]
+}
+
+### Post without an idempotency key (expect 201, every send posts a NEW entry)
+# With no key there is no retry protection. The UI always sends one.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "No key - posts every time",
+  "reference": "NOKEY-1",
+  "lines": [
+    { "accountId": 1, "debit": 10, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 10 }
+  ]
+}
+
+### Withdrawal: Dr Customer Deposits 2000, Cr Cash 2000 (expect 201)
+# Same two accounts as the deposit, opposite sides. Debit lowers a liability.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-17",
+  "description": "Cash withdrawal - Jane Wanjiru",
+  "reference": "WDR-00123-20261017",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 3, "debit": 2000, "credit": 0 },
+    { "accountId": 1, "debit": 0, "credit": 2000 }
+  ]
+}
+
+### Deposit into the sub-account created above (expect 201)
+# Needs createAccount to have run. Posts to the child account, not the control account.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-17",
+  "description": "Deposit to Jane's savings",
+  "reference": "DEP-00123-20261017",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 1, "debit": 1500, "credit": 0 },
+    { "accountId": {{createAccount.response.body.$.id}}, "debit": 0, "credit": 1500 }
+  ]
+}
+
+### Loan disbursed in cash: Dr Loan Receivable 10000, Cr Cash 10000 (expect 201)
+# Cash turns into a different asset. No income is recorded.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-17",
+  "description": "Loan disbursement",
+  "reference": "LN-0001-DISB",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 2, "debit": 10000, "credit": 0 },
+    { "accountId": 1, "debit": 0, "credit": 10000 }
+  ]
+}
+
+### Loan repayment with THREE lines (expect 201)
+# Cash up 1100, principal down 1000, interest income up 100. Debits 1100 = credits 1100.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-18",
+  "description": "Loan repayment: 1000 principal + 100 interest",
+  "reference": "LN-0001-REPAY-1",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 1, "debit": 1100, "credit": 0 },
+    { "accountId": 2, "debit": 0, "credit": 1000 },
+    { "accountId": 5, "debit": 0, "credit": 100 }
+  ]
+}
+
+### Backdated entry (expect 201)
+# Accounting date 2026-10-01, but posted-at is now. They are different things.
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-01",
+  "description": "Backdated deposit",
+  "reference": "DEP-BACK-1",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 1, "debit": 250.50, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 250.50 }
+  ]
+}
+
+
+# =====================================================================
+# 3. POSTING: THINGS THAT MUST BE REJECTED
+# =====================================================================
 
 ### Unbalanced entry (expect 400, code "UnbalancedEntry")
+# Debits 5000 vs credits 4999. The core rule of the system.
 POST {{host}}/api/journal-entries
 Content-Type: application/json
 
@@ -58,20 +244,326 @@ Content-Type: application/json
   ]
 }
 
-### Get an entry (use the id from the first post)
-GET {{host}}/api/journal-entries/1
-
-### Reverse it (expect 201; doing it twice gives 409)
-POST {{host}}/api/journal-entries/1/reverse
+### Only one line (expect 400, an entry needs at least two)
+POST {{host}}/api/journal-entries
 Content-Type: application/json
 
-{ "date": "2026-10-16" }
+{
+  "date": "2026-10-16",
+  "description": "Single line",
+  "reference": "BAD-3",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 0 }
+  ]
+}
 
-### Cash ledger with running balance
+### No lines at all (expect 400)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Empty",
+  "reference": "BAD-4",
+  "lines": []
+}
+
+### A line with both debit and credit (expect 400, one side only)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Both sides on one line",
+  "reference": "BAD-5",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 100 },
+    { "accountId": 3, "debit": 0, "credit": 0 }
+  ]
+}
+
+### A line with zero on both sides (expect 400)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Zero line",
+  "reference": "BAD-6",
+  "lines": [
+    { "accountId": 1, "debit": 0, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 0 }
+  ]
+}
+
+### Negative amount (expect 400)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Negative",
+  "reference": "BAD-7",
+  "lines": [
+    { "accountId": 1, "debit": -100, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": -100 }
+  ]
+}
+
+### Three decimal places (expect 400, money has at most 2)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "Too precise",
+  "reference": "BAD-8",
+  "lines": [
+    { "accountId": 1, "debit": 10.005, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 10.005 }
+  ]
+}
+
+### Missing description (expect 400, validation problem)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "",
+  "reference": "BAD-9",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 100 }
+  ]
+}
+
+### Missing reference (expect 400, validation problem)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-16",
+  "description": "No reference",
+  "reference": "",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 100 }
+  ]
+}
+
+### Malformed date (expect 400)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "not-a-date",
+  "description": "Bad date",
+  "reference": "BAD-10",
+  "lines": [
+    { "accountId": 1, "debit": 100, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 100 }
+  ]
+}
+
+
+# =====================================================================
+# 4. READING AND REVERSING AN ENTRY
+# =====================================================================
+
+### Get an entry by id (use an id that exists; 1 is the first post)
+# Shows lines, reversalOfEntryId and reversedByEntryId.
+GET {{host}}/api/journal-entries/1
+
+### Get an entry that does not exist (expect 404)
+GET {{host}}/api/journal-entries/99999
+
+### Reversal flow, step 1: post an entry to reverse (expect 201)
+# @name toReverse
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-18",
+  "description": "Deposit that will be reversed",
+  "reference": "REV-DEMO-1",
+  "idempotencyKey": "{{$guid}}",
+  "lines": [
+    { "accountId": 1, "debit": 777, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 777 }
+  ]
+}
+
+### Reversal flow, step 2: reverse it (expect 201)
+# Posts a NEW entry with debits and credits flipped. The original is untouched.
+# Description is optional. Leave it out and the server writes a default.
+# @name reversal
+POST {{host}}/api/journal-entries/{{toReverse.response.body.$.id}}/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-18", "description": "Customer deposited by mistake" }
+
+### Reversal flow, step 3: reverse it AGAIN (expect 409, already reversed)
+POST {{host}}/api/journal-entries/{{toReverse.response.body.$.id}}/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-18" }
+
+### Reversal flow, step 4: reverse the REVERSAL (expect 4xx, not allowed)
+# A reversal can't itself be reversed. Post a new entry instead.
+POST {{host}}/api/journal-entries/{{reversal.response.body.$.id}}/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-18" }
+
+### Reversal flow, step 5: the original now shows reversedByEntryId
+GET {{host}}/api/journal-entries/{{toReverse.response.body.$.id}}
+
+### Reversal flow, step 6: the reversal shows reversalOfEntryId
+GET {{host}}/api/journal-entries/{{reversal.response.body.$.id}}
+
+### Reverse with no description (expect 201 on a fresh entry; use another id)
+# Change the id to an entry that has not been reversed yet.
+POST {{host}}/api/journal-entries/2/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-18" }
+
+### Reverse an entry that does not exist (expect 404)
+POST {{host}}/api/journal-entries/99999/reverse
+Content-Type: application/json
+
+{ "date": "2026-10-18" }
+
+### Reverse with a missing date (expect 400)
+POST {{host}}/api/journal-entries/3/reverse
+Content-Type: application/json
+
+{ }
+
+
+# =====================================================================
+# 5. JOURNAL LIST
+# =====================================================================
+
+### Journal list (newest accounting date first, then newest id)
+GET {{host}}/api/journal-entries?page=1&pageSize=10
+
+### Defaults (page 1, page size 20)
+GET {{host}}/api/journal-entries
+
+### Second page
+GET {{host}}/api/journal-entries?page=2&pageSize=5
+
+### Date range filter (both ends inclusive, on the ACCOUNTING date)
+GET {{host}}/api/journal-entries?from=2026-10-10&to=2026-10-16
+
+### Only a lower bound
+GET {{host}}/api/journal-entries?from=2026-10-17
+
+### Only an upper bound
+GET {{host}}/api/journal-entries?to=2026-10-12
+
+### Range with no entries (expect 200 with an empty items list, totalCount 0)
+GET {{host}}/api/journal-entries?from=2000-01-01&to=2000-01-31
+
+### Page size above the limit (expect 200, the server clamps it to 100)
+GET {{host}}/api/journal-entries?pageSize=1000
+
+### Page past the end (expect 200 with empty items, totalCount still correct)
+GET {{host}}/api/journal-entries?page=9999&pageSize=10
+
+### Bad date (expect 400)
+GET {{host}}/api/journal-entries?from=yesterday
+
+
+# =====================================================================
+# 6. ACCOUNT LEDGER
+# =====================================================================
+
+### Cash ledger with running balance (all time)
 GET {{host}}/api/accounts/1/ledger
 
-### Trial balance
+### Cash ledger for a date range
+# The opening balance is everything before "from", so the running balance
+# starts where the previous period ended.
+GET {{host}}/api/accounts/1/ledger?from=2026-10-16&to=2026-10-17
+
+### Customer Deposits ledger (a liability: credit-normal)
+GET {{host}}/api/accounts/3/ledger
+
+### Loan Receivable ledger
+GET {{host}}/api/accounts/2/ledger
+
+### Interest Income ledger
+GET {{host}}/api/accounts/5/ledger
+
+### Ledger for an account that does not exist (expect 404)
+GET {{host}}/api/accounts/999/ledger
+
+### Ledger with a reversed range (from after to). Expect 4xx or empty lines
+GET {{host}}/api/accounts/1/ledger?from=2026-10-31&to=2026-10-01
+
+
+# =====================================================================
+# 7. REPORTS
+# =====================================================================
+
+### Trial balance (today)
+# isBalanced must always be true, and grand debits must equal grand credits.
 GET {{host}}/api/reports/trial-balance
 
-### Trial balance as of a date
+### Trial balance as of a date (only entries on or before it)
 GET {{host}}/api/reports/trial-balance?asOf=2026-10-15
+
+### Trial balance as of a date before any entry (expect all zero, still balanced)
+GET {{host}}/api/reports/trial-balance?asOf=2000-01-01
+
+### Bad date (expect 400)
+GET {{host}}/api/reports/trial-balance?asOf=soon
+
+
+# =====================================================================
+# 8. DEMO DATA FOR THE TRIAL BALANCE
+# Fixed keys, so re-running replays instead of reposting (200, no change).
+# =====================================================================
+
+### 1. Deposit 5,000 (Dr Cash, Cr Customer Deposits)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{ "date": "2026-10-10", "description": "Cash deposit", "reference": "DEMO-1", "idempotencyKey": "tb-demo-1",
+  "lines": [ { "accountId": 1, "debit": 5000, "credit": 0 }, { "accountId": 3, "debit": 0, "credit": 5000 } ] }
+
+### 2. Withdrawal 2,000 (Dr Customer Deposits, Cr Cash)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{ "date": "2026-10-12", "description": "Cash withdrawal", "reference": "DEMO-2", "idempotencyKey": "tb-demo-2",
+  "lines": [ { "accountId": 3, "debit": 2000, "credit": 0 }, { "accountId": 1, "debit": 0, "credit": 2000 } ] }
+
+### 3. Members buy shares worth 3,000 (Dr Cash, Cr Share Capital)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{ "date": "2026-10-14", "description": "Share purchase", "reference": "DEMO-3", "idempotencyKey": "tb-demo-3",
+  "lines": [ { "accountId": 1, "debit": 3000, "credit": 0 }, { "accountId": 4, "debit": 0, "credit": 3000 } ] }
+
+### 4. Interest of 50 credited to savings (Dr Interest Expense, Cr Customer Deposits)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{ "date": "2026-10-15", "description": "Savings interest", "reference": "DEMO-4", "idempotencyKey": "tb-demo-4",
+  "lines": [ { "accountId": 6, "debit": 50, "credit": 0 }, { "accountId": 3, "debit": 0, "credit": 50 } ] }
+
+
+# =====================================================================
+# 9. API BEHAVIOUR CHECKS
+# =====================================================================
+
+### Unknown API route (expect 404 JSON/empty, NOT the Blazor index.html)
+# Proves the /api catch-all works, so a mistyped URL never returns HTML.
+GET {{host}}/api/does-not-exist
+
+### Wrong method on a route (expect 405)
+DELETE {{host}}/api/journal-entries/1

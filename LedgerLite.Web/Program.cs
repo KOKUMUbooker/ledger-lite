@@ -1,6 +1,7 @@
 using Bit.BlazorUI;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using LedgerLite.Web.Services;
 
 namespace LedgerLite.Web;
 
@@ -14,6 +15,7 @@ public class Program
 
         builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
         builder.Services.AddBitBlazorUIServices();
+        builder.Services.AddScoped<LedgerApiClient>();
 
         await builder.Build().RunAsync();
     }

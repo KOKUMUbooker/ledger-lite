@@ -22,4 +22,20 @@ public record JournalEntryDto(
     string Source,
     string? IdempotencyKey,
     int? ReversalOfEntryId,
+    int? ReversedByEntryId,
     IReadOnlyList<JournalLineDto> Lines);
+
+/// One row in the journal list: no lines, just a total and a line count.
+public record JournalEntrySummaryDto(
+    int Id,
+    DateOnly Date,
+    DateTime PostedAt,
+    string Description,
+    string Reference,
+    string Source,
+    int? ReversalOfEntryId,
+    int? ReversedByEntryId,
+    decimal Total,
+    int LineCount);
+
+public record PagedResultDto<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);

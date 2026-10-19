@@ -5,7 +5,7 @@ public record LedgerLineDto(
     decimal Debit, decimal Credit, decimal RunningBalance);
 
 public record AccountLedgerDto(
-    int AccountId, string Code, string Name, string Type,
+    int AccountId, string Code, string Name, string Type, string NormalBalance,
     DateOnly? From, DateOnly? To,
     decimal OpeningBalance,
     IReadOnlyList<LedgerLineDto> Lines,

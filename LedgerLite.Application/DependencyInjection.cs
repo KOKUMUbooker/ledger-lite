@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<GetTrialBalance>();
         services.AddScoped<ListAccounts>();
         services.AddScoped<GetJournalEntry>();
+        services.AddScoped<ListJournalEntries>();
         return services;
     }
 }

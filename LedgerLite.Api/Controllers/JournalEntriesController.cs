@@ -11,12 +11,33 @@ public class JournalEntriesController : ControllerBase
     private readonly PostJournalEntry _post;
     private readonly ReverseJournalEntry _reverse;
     private readonly GetJournalEntry _get;
+    private readonly ListJournalEntries _list;
 
-    public JournalEntriesController(PostJournalEntry post, ReverseJournalEntry reverse, GetJournalEntry get)
+    public JournalEntriesController(
+        PostJournalEntry post, ReverseJournalEntry reverse, GetJournalEntry get, ListJournalEntries list)
     {
         _post = post;
         _reverse = reverse;
         _get = get;
+        _list = list;
+    }
+
+    // GET /api/journal-entries?from=2026-09-01&to=2026-09-30&page=1&pageSize=20   (newest first)
+    [HttpGet]
+    public async Task<ActionResult<PagedResultDto<JournalEntrySummaryDto>>> List(
+        [FromQuery(Name = "from")] DateOnly? fromDate,
+        [FromQuery(Name = "to")] DateOnly? toDate,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
+    {
+        if (fromDate > toDate)
+            return Problem("'from' must not be after 'to'.", statusCode: 400, title: "Invalid request");
+
+        var result = await _list.ExecuteAsync(fromDate, toDate, page, pageSize, ct);
+
+        return Ok(new PagedResultDto<JournalEntrySummaryDto>(
+            result.Items.Select(i => i.ToDto()).ToList(), result.Page, result.PageSize, result.TotalCount));
     }
 
     // POST /api/journal-entries
@@ -33,10 +54,15 @@ public class JournalEntriesController : ControllerBase
         var result = await _post.ExecuteAsync(new PostJournalEntryCommand(
             request.Date, request.Description, request.Reference, lines, request.IdempotencyKey), ct);
 
-        var dto = result.Entry.ToDto();
-        return result.WasDuplicate
-            ? Ok(dto)
-            : Created($"/api/journal-entries/{dto.Id}", dto);
+        if (!result.WasDuplicate)
+        {
+            var created = result.Entry.ToDto();
+            return Created($"/api/journal-entries/{created.Id}", created);
+        }
+
+        // A replay may refer to an entry that has been reversed since, so return its current state
+        var current = await _get.ExecuteAsync(result.Entry.Id, ct);
+        return Ok(current.ToDto());
     }
 
     // GET /api/journal-entries/42

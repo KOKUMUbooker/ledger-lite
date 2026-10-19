@@ -1,0 +1,166 @@
+﻿@page "/accounts"
+@inject LedgerApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Accounts · LedgerLite</PageTitle>
+
+<PageHeader Title="Chart of accounts" Subtitle="Every account the books can post to.">
+    <BitButton IconName="Add" OnClick="OpenDialog">New account</BitButton>
+</PageHeader>
+
+<SuccessBanner @bind-Message="_success" />
+<ErrorBanner @bind-Message="_error" />
+
+<div class="filter-bar">
+    <div class="filter-field">
+        <BitDropdown TItem="BitDropdownItem<string>" TValue="string"
+                     Items="_typeItems"
+                     @bind-Value="_typeFilter"
+                     Label="Type" />
+    </div>
+    <div class="filter-field grow">
+        <BitTextField @bind-Value="_search"
+                      Label="Search"
+                      Placeholder="Code or name"
+                      Immediate
+                      DebounceTime="250"
+                      ShowClearButton />
+    </div>
+</div>
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Loading accounts…" />
+}
+else if (_loaded)
+{
+    var rows = Filtered.ToList();
+
+    @if (_accounts.Count == 0)
+    {
+        <p class="empty-state">No accounts yet. Create your first account to get started.</p>
+    }
+    else if (rows.Count == 0)
+    {
+        <p class="empty-state">No accounts match your filters.</p>
+    }
+    else
+    {
+        <p class="muted">Showing @rows.Count of @_accounts.Count accounts</p>
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Normal balance</th>
+                        <th>Parent</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var account in rows)
+                    {
+                        <tr class="clickable @(account.IsActive ? "" : "inactive")"
+                            @onclick="() => OpenLedger(account.Id)">
+                            <td class="mono">@account.Code</td>
+                            <td>@account.Name</td>
+                            <td><AccountTypeBadge Type="@account.Type" /></td>
+                            <td>@account.NormalBalance</td>
+                            <td>@ParentText(account)</td>
+                            <td>@(account.IsActive ? "Active" : "Inactive")</td>
+                            <td>
+                                <a href="/accounts/@account.Id/ledger" @onclick:stopPropagation="true">Ledger</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+<AccountFormDialog @bind-IsOpen="_dialogOpen" Accounts="_accounts" OnCreated="OnCreated" />
+
+@code {
+    private static readonly List<BitDropdownItem<string>> _typeItems = new()
+    {
+        new() { Text = "All types", Value = "All" },
+        new() { Text = "Asset", Value = "Asset" },
+        new() { Text = "Liability", Value = "Liability" },
+        new() { Text = "Equity", Value = "Equity" },
+        new() { Text = "Income", Value = "Income" },
+        new() { Text = "Expense", Value = "Expense" }
+    };
+
+    private List<AccountDto> _accounts = new();
+    private Dictionary<int, AccountDto> _byId = new();
+    private string? _typeFilter = "All";
+    private string? _search;
+    private string? _error;
+    private string? _success;
+    private bool _loading = true;
+    private bool _loaded;
+    private bool _dialogOpen;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _accounts = await Api.ListAccountsAsync();
+            _byId = _accounts.ToDictionary(a => a.Id);
+            _loaded = true;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<AccountDto> Filtered
+    {
+        get
+        {
+            var query = _accounts.AsEnumerable();
+
+            if (_typeFilter is not (null or "All"))
+                query = query.Where(a => a.Type == _typeFilter);
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var term = _search.Trim();
+                query = query.Where(a =>
+                    a.Code.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                    a.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return query;
+        }
+    }
+
+    private string ParentText(AccountDto account) =>
+        account.ParentAccountId is int parentId && _byId.TryGetValue(parentId, out var parent)
+            ? $"{parent.Code} · {parent.Name}"
+            : "—";
+
+    private void OpenDialog() => _dialogOpen = true;
+
+    private void OpenLedger(int id) => Navigation.NavigateTo($"/accounts/{id}/ledger");
+
+    private async Task OnCreated(AccountDto created)
+    {
+        _error = null;
+        _success = $"Account {created.Code} · {created.Name} created.";
+        await LoadAsync();
+    }
+}

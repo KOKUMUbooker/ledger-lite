@@ -1,0 +1,5 @@
+﻿<span class="badge badge-@Type.ToLowerInvariant()">@Type</span>
+
+@code {
+    [Parameter, EditorRequired] public string Type { get; set; } = string.Empty;
+}

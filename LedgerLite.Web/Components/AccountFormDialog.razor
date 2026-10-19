@@ -1,0 +1,189 @@
+﻿@inject LedgerApiClient Api
+
+<BitModal IsOpen="IsOpen" Blocking="true" OnDismiss="Cancel">
+    <div class="dialog">
+        <h2 class="dialog-title">New account</h2>
+
+        <ErrorBanner @bind-Message="_error" />
+
+        <div class="dialog-body">
+            <BitTextField @bind-Value="_code"
+                          Label="Code"
+                          Placeholder="e.g. 2001"
+                          Required
+                          MaxLength="20"
+                          Immediate
+                          ErrorMessage="@CodeError" />
+
+            <BitTextField @bind-Value="_name"
+                          Label="Name"
+                          Placeholder="e.g. Omondi Timon - Savings 00123"
+                          Required
+                          MaxLength="200"
+                          Immediate
+                          ErrorMessage="@NameError" />
+
+            <div>
+                <BitDropdown TItem="BitDropdownItem<string>" TValue="string"
+                             Items="_typeItems"
+                             @bind-Value="_type"
+                             @bind-Value:after="OnTypeChanged"
+                             Label="Type"
+                             Placeholder="Choose an account type"
+                             Required />
+                @if (TypeError is not null)
+                {
+                    <div class="field-error">@TypeError</div>
+                }
+                @if (NormalBalanceHint is not null)
+                {
+                    <p class="muted">@NormalBalanceHint</p>
+                }
+            </div>
+
+            @if (_type is not null)
+            {
+                <div>
+                    <BitDropdown TItem="BitDropdownItem<int?>" TValue="int?"
+                                 Items="_parentItems"
+                                 @bind-Value="_parentId"
+                                 Label="Parent account (optional)"
+                                 Placeholder="None"
+                                 ShowClearButton="true" />
+                    <p class="muted">
+                        A parent is a control account of the same type, such as Customer Deposits.
+                        The parent's total rolls up its children.
+                    </p>
+                </div>
+            }
+        </div>
+
+        <div class="dialog-actions">
+            <BitButton Variant="BitVariant.Outline" IsEnabled="!_saving" OnClick="Cancel">Cancel</BitButton>
+            <BitButton Color="BitColor.Primary" IsLoading="_saving" OnClick="Submit">Create account</BitButton>
+        </div>
+    </div>
+</BitModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    /// Accounts already loaded by the page: used for the parent list and the normal-balance hint.
+    [Parameter] public IReadOnlyList<AccountDto> Accounts { get; set; } = Array.Empty<AccountDto>();
+
+    [Parameter] public EventCallback<AccountDto> OnCreated { get; set; }
+
+    private static readonly List<BitDropdownItem<string>> _typeItems = new()
+    {
+        new() { Text = "Asset", Value = "Asset" },
+        new() { Text = "Liability", Value = "Liability" },
+        new() { Text = "Equity", Value = "Equity" },
+        new() { Text = "Income", Value = "Income" },
+        new() { Text = "Expense", Value = "Expense" }
+    };
+
+    private List<BitDropdownItem<int?>> _parentItems = new();
+
+    private string? _code;
+    private string? _name;
+    private string? _type;
+    private int? _parentId;
+    private string? _error;
+    private bool _submitted;
+    private bool _saving;
+    private bool _wasOpen;
+
+    // Start with a clean form every time the dialog opens
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen) Reset();
+        _wasOpen = IsOpen;
+    }
+
+    private void Reset()
+    {
+        _code = null;
+        _name = null;
+        _type = null;
+        _parentId = null;
+        _parentItems = new();
+        _error = null;
+        _submitted = false;
+        _saving = false;
+    }
+
+    // A parent must be an active account of the same type
+    private void OnTypeChanged()
+    {
+        _parentId = null;
+        _parentItems = Accounts
+            .Where(a => a.IsActive && a.Type == _type)
+            .OrderBy(a => a.Code)
+            .Select(a => new BitDropdownItem<int?> { Text = $"{a.Code} · {a.Name}", Value = a.Id })
+            .ToList();
+    }
+
+    private string? CodeError =>
+        !_submitted ? null
+        : string.IsNullOrWhiteSpace(_code) ? "Code is required."
+        : _code.Trim().Length > 20 ? "Code can be at most 20 characters."
+        : null;
+
+    private string? NameError =>
+        !_submitted ? null
+        : string.IsNullOrWhiteSpace(_name) ? "Name is required."
+        : _name.Trim().Length > 200 ? "Name can be at most 200 characters."
+        : null;
+
+    private string? TypeError =>
+        _submitted && string.IsNullOrEmpty(_type) ? "Choose an account type." : null;
+
+    private string? NormalBalanceHint
+    {
+        get
+        {
+            if (_type is null) return null;
+            var normal = Accounts.FirstOrDefault(a => a.Type == _type)?.NormalBalance;
+            if (normal is null) return null;
+            var side = normal.ToLowerInvariant();
+            return $"{_type} accounts are {side}-normal: a {side} increases them.";
+        }
+    }
+
+    private async Task Cancel()
+    {
+        if (_saving) return;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task Submit()
+    {
+        if (_saving) return;
+
+        _submitted = true;
+        _error = null;
+        if (CodeError is not null || NameError is not null || TypeError is not null) return;
+
+        _saving = true;
+        try
+        {
+            // The dropdown may hand back null or 0 after "clear"; both mean "no parent"
+            int? parentId = _parentId is > 0 ? _parentId : null;
+
+            var created = await Api.CreateAccountAsync(
+                new CreateAccountRequest(_code!.Trim(), _name!.Trim(), _type!, parentId));
+
+            await IsOpenChanged.InvokeAsync(false);
+            await OnCreated.InvokeAsync(created);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

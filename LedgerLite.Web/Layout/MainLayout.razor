@@ -1,4 +1,38 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    @Body
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<div class="app-shell @(_navOpen ? "nav-open" : "")">
+    <header class="app-header">
+        <button type="button" class="nav-toggle" aria-label="Toggle navigation" @onclick="ToggleNav">☰</button>
+        <span class="app-title">LedgerLite</span>
+        <BitButton IconName="Add" OnClick="NewEntry">New entry</BitButton>
+    </header>
+
+    <aside class="app-nav">
+        <NavMenu />
+    </aside>
+
+    <main class="app-content">
+        @Body
+    </main>
 </div>
+
+@code {
+    private bool _navOpen;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void ToggleNav() => _navOpen = !_navOpen;
+
+    private void NewEntry() => Navigation.NavigateTo("/journal/new");
+
+    // On narrow screens, close the menu after navigating
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _navOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

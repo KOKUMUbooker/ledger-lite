@@ -1,0 +1,154 @@
+﻿@page "/how-it-works"
+
+<PageTitle>How it works · LedgerLite</PageTitle>
+
+<PageHeader Title="How it works" Subtitle="Double-entry bookkeeping in two minutes." />
+
+<article class="guide">
+
+    <section>
+        <h2>The one idea</h2>
+        <p class="guide-equation">Assets = Liabilities + Equity</p>
+        <p>
+            Everything the business <strong>owns</strong> (assets) was paid for by money it <strong>owes</strong>
+            (liabilities) or money that belongs to its <strong>owners</strong> (equity). Every transaction touches at
+            least two accounts, so the equation stays true after it. That's why the books always balance.
+        </p>
+        <p>
+            All the accounts here belong to the <strong>bank or SACCO</strong>. A customer's savings balance is a
+            liability: money the institution owes back to them.
+        </p>
+    </section>
+
+    <section>
+        <h2>Debit and credit</h2>
+        <p>
+            Debit and credit are not "money in" and "money out". They are the <strong>left</strong> and
+            <strong>right</strong> side of an entry. What each side does depends on the account type:
+        </p>
+
+        <table class="data-table">
+            <thead>
+                <tr><th>Account type</th><th>Example</th><th>Debit</th><th>Credit</th><th>Normal balance</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Asset</td><td>Cash, Loan Receivable</td><td class="dc-up">Increases</td><td class="dc-down">Decreases</td><td>Debit</td></tr>
+                <tr><td>Expense</td><td>Interest Expense</td><td class="dc-up">Increases</td><td class="dc-down">Decreases</td><td>Debit</td></tr>
+                <tr><td>Liability</td><td>Customer Deposits</td><td class="dc-down">Decreases</td><td class="dc-up">Increases</td><td>Credit</td></tr>
+                <tr><td>Equity</td><td>Share Capital</td><td class="dc-down">Decreases</td><td class="dc-up">Increases</td><td>Credit</td></tr>
+                <tr><td>Income</td><td>Interest Income</td><td class="dc-down">Decreases</td><td class="dc-up">Increases</td><td>Credit</td></tr>
+            </tbody>
+        </table>
+
+        <p class="muted">
+            The memory aid: debit increases <strong>Assets and Expenses</strong>. Credit increases
+            <strong>Liabilities, Income and Equity</strong>. An account's <em>normal balance</em> is the side that
+            increases it, and it's where a healthy balance sits.
+        </p>
+    </section>
+
+    <section>
+        <h2>An entry is one event, made of lines</h2>
+        <p>
+            A <strong>journal entry</strong> records one financial event. It is made of two or more
+            <strong>lines</strong>, each putting an amount on the debit or credit side of one account. The entry is
+            only accepted if total debits equal total credits.
+        </p>
+
+        <div class="guide-example">
+            <h3>A customer deposits 5,000 cash</h3>
+            <table class="data-table compact">
+                <thead><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th>What happens</th></tr></thead>
+                <tbody>
+                    <tr><td>Cash</td><td class="num">5,000.00</td><td class="num"></td><td>Asset up: the bank holds more cash</td></tr>
+                    <tr><td>Customer Deposits</td><td class="num"></td><td class="num">5,000.00</td><td>Liability up: the bank owes the customer more</td></tr>
+                </tbody>
+            </table>
+            <p><a href="/journal/new?example=deposit">Try this example in the form →</a></p>
+        </div>
+
+        <div class="guide-example">
+            <h3>A customer repays 1,100 on a loan (1,000 principal and 100 interest)</h3>
+            <table class="data-table compact">
+                <thead><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th><th>What happens</th></tr></thead>
+                <tbody>
+                    <tr><td>Cash</td><td class="num">1,100.00</td><td class="num"></td><td>Asset up: cash received</td></tr>
+                    <tr><td>Loan Receivable</td><td class="num"></td><td class="num">1,000.00</td><td>Asset down: the principal is repaid</td></tr>
+                    <tr><td>Interest Income</td><td class="num"></td><td class="num">100.00</td><td>Income up: interest earned</td></tr>
+                </tbody>
+            </table>
+            <p class="muted">An entry can have more than two lines. Debits (1,100) still equal credits (1,000 + 100).</p>
+            <p><a href="/journal/new?example=repayment">Try this example in the form →</a></p>
+        </div>
+    </section>
+
+    <section>
+        <h2>The rules LedgerLite enforces</h2>
+        <ul class="guide-rules">
+            <li><strong>At least two lines.</strong> One-sided events don't exist; money always comes from or goes somewhere.</li>
+            <li><strong>Debits equal credits.</strong> This is what keeps the equation true.</li>
+            <li><strong>One side per line.</strong> A line is a debit or a credit, never both, never zero.</li>
+            <li><strong>Positive amounts, two decimals.</strong> Direction comes from the side, not a minus sign.</li>
+            <li><strong>Posted entries are never edited or deleted.</strong> That's what makes the ledger an audit trail.</li>
+            <li><strong>Mistakes are fixed by reversal.</strong> See below.</li>
+            <li><strong>Balances are derived, not stored.</strong> An account's balance is always computed from its lines, so it can't drift out of sync.</li>
+            <li><strong>Retries are safe.</strong> Each post carries an idempotency key, so a repeated request returns the original entry instead of posting twice.</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Fixing a mistake: reversal</h2>
+        <p>
+            You can't edit a posted entry. You post a <strong>new entry that flips every debit and credit</strong>, so
+            the two cancel out. Both stay in the ledger, which keeps the history honest. An entry can be reversed once,
+            and a reversal can't itself be reversed. If that's still wrong, post a fresh entry.
+        </p>
+
+        <div class="guide-pair">
+            <div>
+                <h3>Original</h3>
+                <table class="data-table compact">
+                    <thead><tr><th>Account</th><th class="num">Dr</th><th class="num">Cr</th></tr></thead>
+                    <tbody>
+                        <tr><td>Cash</td><td class="num">5,000.00</td><td class="num"></td></tr>
+                        <tr><td>Customer Deposits</td><td class="num"></td><td class="num">5,000.00</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h3>Reversal</h3>
+                <table class="data-table compact">
+                    <thead><tr><th>Account</th><th class="num">Dr</th><th class="num">Cr</th></tr></thead>
+                    <tbody>
+                        <tr><td>Cash</td><td class="num"></td><td class="num">5,000.00</td></tr>
+                        <tr><td>Customer Deposits</td><td class="num">5,000.00</td><td class="num"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>Where things are in the app</h2>
+        <dl class="guide-glossary">
+            <dt><a href="/accounts">Accounts</a></dt>
+            <dd>The chart of accounts: every account the books can post to.</dd>
+
+            <dt><a href="/journal/new">New entry</a></dt>
+            <dd>Where you post. <em>Posting</em> means checking an entry and saving it permanently.</dd>
+
+            <dt><a href="/journal">Journal</a></dt>
+            <dd>Every posted entry, newest first, with reversal badges.</dd>
+
+            <dt>Ledger</dt>
+            <dd>One account's lines in date order with a running balance. Open it from any account.</dd>
+
+            <dt><a href="/reports/trial-balance">Trial balance</a></dt>
+            <dd>Every account's debits and credits. The two grand totals must match, which proves the books balance.</dd>
+
+            <dt>Accounting date vs posted at</dt>
+            <dd>The date an event belongs to, versus the moment it was recorded. You can backdate the first, never the second.</dd>
+        </dl>
+    </section>
+
+</article>

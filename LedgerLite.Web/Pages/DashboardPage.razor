@@ -1,0 +1,195 @@
+﻿@page "/"
+@implements IDisposable
+@inject LedgerApiClient Api
+
+<PageTitle>Dashboard · LedgerLite</PageTitle>
+
+<PageHeader Title="Dashboard" Subtitle="The books at a glance.">
+    <BitButton Variant="BitVariant.Outline" IconName="Refresh" IsEnabled="!_loading" OnClick="LoadAsync">Refresh</BitButton>
+    <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+</PageHeader>
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading && _trial is null)
+{
+    <LoadingIndicator Text="Loading dashboard…" />
+}
+else if (_trial is not null)
+{
+    <section class="dash-equation @(EquationHolds ? "ok" : "bad")">
+        <div class="dash-equation-head">
+            <h2>Accounting equation</h2>
+            <BalancedBadge IsBalanced="_trial.IsBalanced" />
+        </div>
+        <div class="dash-equation-body">
+            <div><span class="dash-label">Assets</span><strong>@Fmt.Money(TotalAssets)</strong></div>
+            <span class="dash-op">=</span>
+            <div><span class="dash-label">Liabilities</span><strong>@Fmt.Money(Liabilities)</strong></div>
+            <span class="dash-op">+</span>
+            <div><span class="dash-label">Equity</span><strong>@Fmt.Money(Equity)</strong></div>
+            <span class="dash-op">+</span>
+            <div><span class="dash-label">Net income</span><strong>@Fmt.Money(NetIncome)</strong></div>
+        </div>
+        <p class="muted">
+            Net income is Income − Expenses. It sits on the right-hand side until the books are closed.
+            @(EquationHolds
+                ? "Both sides match."
+                : "The two sides differ. That should be impossible, so investigate.")
+        </p>
+    </section>
+
+    <div class="dash-tiles">
+        <a class="dash-tile" href="/reports/trial-balance">
+            <span class="dash-label">Total debits</span>
+            <strong>@Fmt.Money(_trial.GrandTotalDebits)</strong>
+        </a>
+        <a class="dash-tile" href="/reports/trial-balance">
+            <span class="dash-label">Total credits</span>
+            <strong>@Fmt.Money(_trial.GrandTotalCredits)</strong>
+        </a>
+        <a class="dash-tile" href="/accounts">
+            <span class="dash-label">Accounts with activity</span>
+            <strong>@_trial.Rows.Count(r => r.TotalDebits != 0 || r.TotalCredits != 0)</strong>
+        </a>
+        <a class="dash-tile" href="/journal">
+            <span class="dash-label">Journal entries</span>
+            <strong>@(_recent?.TotalCount ?? 0)</strong>
+        </a>
+    </div>
+
+    @if (Abnormal.Count > 0)
+    {
+        <BitMessage Color="BitColor.Warning">
+            <strong>@Abnormal.Count account@(Abnormal.Count == 1 ? "" : "s") with an unusual balance.</strong>
+            Each has a balance on the opposite side from its normal one, which is allowed but worth a look:
+            @foreach (var r in Abnormal)
+            {
+                <a class="dash-chip" href="/accounts/@r.AccountId/ledger">@r.Code · @r.Name (@Fmt.Money(r.Balance))</a>
+            }
+        </BitMessage>
+    }
+
+    <h2 class="section-title">Balances by type</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th>Type</th><th>Normal balance</th><th class="num">Balance</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var type in TypeOrder)
+            {
+                <tr>
+                    <td><AccountTypeBadge Type="@type" /></td>
+                    <td class="muted">@(DebitNormal.Contains(type) ? "Debit" : "Credit")</td>
+                    <td class="num">@Fmt.Money(SumOf(type))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h2 class="section-title">Latest entries</h2>
+    @if (_recent is null || _recent.Items.Count == 0)
+    {
+        <p class="empty-state">No entries yet. <a href="/journal/new">Post your first entry</a>.</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th class="num">Total</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in _recent.Items)
+                {
+                    <tr>
+                        <td><a href="/journal/@e.Id">#@e.Id</a></td>
+                        <td>@Fmt.Date(e.Date)</td>
+                        <td>@e.Description</td>
+                        <td class="num">@Fmt.Money(e.Total)</td>
+                        <td>
+                            @if (e.ReversalOfEntryId is not null)
+                            {
+                                <span class="status-badge info">Reversal of #@e.ReversalOfEntryId</span>
+                            }
+                            else if (e.ReversedByEntryId is not null)
+                            {
+                                <span class="status-badge warn">Reversed by #@e.ReversedByEntryId</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p><a href="/journal">View the whole journal →</a></p>
+    }
+}
+
+@code {
+    private static readonly string[] TypeOrder = { "Asset", "Liability", "Equity", "Income", "Expense" };
+    private static readonly HashSet<string> DebitNormal = new() { "Asset", "Expense" };
+
+    private TrialBalanceDto? _trial;
+    private PagedResultDto<JournalEntrySummaryDto>? _recent;
+    private string? _error;
+    private bool _loading;
+    private CancellationTokenSource? _cts;
+
+    // Each row's Balance is already positive on the account's normal side, so type totals just add up
+    private decimal SumOf(string type) => _trial!.Rows.Where(r => r.Type == type).Sum(r => r.Balance);
+
+    private decimal TotalAssets => SumOf("Asset");
+    private decimal Liabilities => SumOf("Liability");
+    private decimal Equity => SumOf("Equity");
+    private decimal NetIncome => SumOf("Income") - SumOf("Expense");
+    private bool EquationHolds => TotalAssets == Liabilities + Equity + NetIncome;
+
+    private List<TrialBalanceRowDto> Abnormal =>
+        _trial is null ? new() : _trial.Rows.Where(r => r.Balance < 0).OrderBy(r => r.Code).ToList();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _loading = true;
+        _error = null;
+
+        try
+        {
+            var trialTask = Api.GetTrialBalanceAsync();
+            var recentTask = Api.ListEntriesAsync(null, null, 1, 5, token);
+            await Task.WhenAll(trialTask, recentTask);
+
+            if (token.IsCancellationRequested) return;
+            _trial = trialTask.Result;
+            _recent = recentTask.Result;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ApiException ex)
+        {
+            if (!token.IsCancellationRequested) _error = ex.Message;
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested) _loading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

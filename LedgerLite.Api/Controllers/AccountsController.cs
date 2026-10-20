@@ -2,11 +2,13 @@
 using LedgerLite.Application.Reports;
 using LedgerLite.Contracts;
 using LedgerLite.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LedgerLite.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/accounts")]
 public class AccountsController : ControllerBase
 {

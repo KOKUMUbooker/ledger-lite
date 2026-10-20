@@ -1,3 +1,4 @@
+using LedgerLite.Api.Auth;
 using LedgerLite.Api.ErrorHandling;
 using LedgerLite.Application;
 using LedgerLite.Data;
@@ -29,6 +30,7 @@ public class Program
         // Errors: exceptions -> ProblemDetails JSON
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<LedgerExceptionHandler>();
+        builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 
         builder.Services.AddOpenApi();
 
@@ -46,6 +48,9 @@ public class Program
         // Serve the Blazor WASM client (_framework files, then wwwroot and static web assets such as Bit's)
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         app.MapControllers();
 

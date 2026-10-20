@@ -15,6 +15,21 @@
 # that depend on an earlier one say so. Rerunnable ones use {{$guid}} keys.
 # =====================================================================
 
+# =====================================================================
+# 0. AUTHENTICATION
+# =====================================================================
+### Sign in as Owner (Development only)
+GET {{host}}/api/auth/dev-login
+
+### Sign in as Visitor, to test 403 on writes
+GET {{host}}/api/auth/dev-login?role=visitor
+
+### Who am I
+GET {{host}}/api/auth/me
+
+### Sign out
+POST {{host}}/api/auth/logout
+
 
 # =====================================================================
 # 1. ACCOUNTS

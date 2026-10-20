@@ -1,0 +1,34 @@
+﻿@inject NavigationManager Nav
+
+<section class="signin-card">
+    <h1>LedgerLite</h1>
+    <p>A double-entry ledger engine built from scratch: accounts, journal entries, reversals, trial balance.</p>
+    <p class="muted">
+        Sign in to explore the demo. Everyone can browse every page. Posting and reversing are limited to the owner.
+    </p>
+
+    <div class="signin-buttons">
+        <BitButton Color="BitColor.Primary" OnClick="GoGoogle">Continue with Google</BitButton>
+        <BitButton Variant="BitVariant.Outline" OnClick="GoGitHub">Continue with GitHub</BitButton>
+    </div>
+
+    <p class="muted">
+        <a href="/how-it-works">How it works</a> ·
+        Nothing is kept except a sign-in cookie holding your provider id and display name.
+    </p>
+</section>
+
+@code {
+    // Where to land after signing in. Must be a path on this site; the Api rejects anything else.
+    [Parameter] public string? ReturnUrl { get; set; }
+
+    private void GoGoogle() => Go("google");
+    private void GoGitHub() => Go("github");
+
+    // forceLoad: this is a real browser navigation to the provider, not a client-side route
+    private void Go(string provider)
+    {
+        var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+        Nav.NavigateTo($"/api/auth/login/{provider}?returnUrl={Uri.EscapeDataString(target)}", forceLoad: true);
+    }
+}

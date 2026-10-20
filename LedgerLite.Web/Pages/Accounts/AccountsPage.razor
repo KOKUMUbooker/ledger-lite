@@ -5,7 +5,9 @@
 <PageTitle>Accounts · LedgerLite</PageTitle>
 
 <PageHeader Title="Chart of accounts" Subtitle="Every account the books can post to.">
-    <BitButton IconName="Add" OnClick="OpenDialog">New account</BitButton>
+    <AuthorizeView Roles="Owner">
+        <BitButton IconName="Add" OnClick="OpenDialog">New account</BitButton>
+    </AuthorizeView>
 </PageHeader>
 
 <SuccessBanner @bind-Message="_success" />

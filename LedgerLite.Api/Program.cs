@@ -1,3 +1,4 @@
+using LedgerLite.Api.Auth;
 using LedgerLite.Api.ErrorHandling;
 using LedgerLite.Application;
 using LedgerLite.Data;
@@ -8,6 +9,17 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        // Load .env, searching upward from the working directory, BEFORE the builder reads configuration.
+        // NoClobber: variables already set in the real environment (on the server, say) win over the file.
+        try
+        {
+            DotNetEnv.Env.NoClobber().TraversePath().Load();
+        }
+        catch (FileNotFoundException)
+        {
+            // No .env file is fine: production can use real environment variables instead.
+        }
+
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);
@@ -18,6 +30,7 @@ public class Program
         // Errors: exceptions -> ProblemDetails JSON
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<LedgerExceptionHandler>();
+        builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
 
         builder.Services.AddOpenApi();
 
@@ -35,6 +48,9 @@ public class Program
         // Serve the Blazor WASM client (_framework files, then wwwroot and static web assets such as Bit's)
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         app.MapControllers();
 

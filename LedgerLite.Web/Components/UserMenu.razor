@@ -1,0 +1,27 @@
+﻿@using System.Security.Claims
+@inject CookieAuthStateProvider Auth
+@inject NavigationManager Nav
+
+<AuthorizeView>
+    <Authorized>
+        <span class="user-menu">
+            <span class="user-name">@context.User.Identity?.Name</span>
+            <span class="role-badge @RoleClass(context.User)">@Role(context.User)</span>
+            <BitButton Variant="BitVariant.Text" OnClick="SignOut">Sign out</BitButton>
+        </span>
+    </Authorized>
+    <NotAuthorized>
+        <BitButton Variant="BitVariant.Outline" Href="/login">Sign in</BitButton>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static string Role(ClaimsPrincipal user) => user.FindFirst(ClaimTypes.Role)?.Value ?? "Visitor";
+    private static string RoleClass(ClaimsPrincipal user) => Role(user) == "Owner" ? "owner" : "visitor";
+
+    private async Task SignOut()
+    {
+        await Auth.SignOutAsync();
+        Nav.NavigateTo("/");
+    }
+}

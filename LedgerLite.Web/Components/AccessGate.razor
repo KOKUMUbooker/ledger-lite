@@ -1,0 +1,26 @@
+﻿@inject NavigationManager Nav
+
+@if (User.Identity?.IsAuthenticated != true)
+{
+    <SignInCard ReturnUrl="@CurrentPath" />
+}
+else
+{
+    <section class="gate-card">
+        <h1>Read-only demo</h1>
+        <p>
+            You're signed in as a visitor. Visitors can browse every page, but posting and reversing entries
+            is limited to the owner.
+        </p>
+        <p>
+            <a href="/">Back to the dashboard</a> · <a href="/how-it-works">How it works</a>
+        </p>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public System.Security.Claims.ClaimsPrincipal User { get; set; } = default!;
+
+    // The page they were trying to open, so signing in brings them straight back to it
+    private string CurrentPath => "/" + Nav.ToBaseRelativePath(Nav.Uri);
+}

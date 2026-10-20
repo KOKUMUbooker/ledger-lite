@@ -1,0 +1,23 @@
+﻿@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+
+<PageTitle>Sign in · LedgerLite</PageTitle>
+
+<SignInCard ReturnUrl="@ReturnUrl" />
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Already signed in: nothing to do here
+        if (AuthState is not null && (await AuthState).User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo(SafeLocal(ReturnUrl), replace: true);
+    }
+
+    // Paths on this site only ("/journal"), never "//evil.com" or a full URL
+    private static string SafeLocal(string? url) =>
+        !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") ? url : "/";
+}

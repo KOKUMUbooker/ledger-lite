@@ -1,6 +1,7 @@
 ﻿@page "/journal/new"
 @using System.Globalization
 @inject LedgerApiClient Api
+@attribute [Authorize(Roles = "Owner")]
 
 <PageTitle>New entry · LedgerLite</PageTitle>
 

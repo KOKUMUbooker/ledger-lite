@@ -20,7 +20,9 @@ else if (_entry is not null)
     <PageHeader Title="@($"Entry #{_entry.Id}")" Subtitle="@_entry.Description">
         @if (CanReverse)
         {
-            <BitButton Variant="BitVariant.Outline" IconName="Undo" OnClick="OpenReverse">Reverse</BitButton>
+             <AuthorizeView Roles="Owner">
+                <BitButton Variant="BitVariant.Outline" IconName="Undo" OnClick="OpenReverse">Reverse</BitButton>
+            </AuthorizeView>
         }
     </PageHeader>
 

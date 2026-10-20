@@ -6,7 +6,10 @@
     <header class="app-header">
         <button type="button" class="nav-toggle" aria-label="Toggle navigation" @onclick="ToggleNav">☰</button>
         <span class="app-title">LedgerLite</span>
-        <BitButton IconName="Add" OnClick="NewEntry">New entry</BitButton>
+        <UserMenu />
+        <AuthorizeView Roles="Owner">
+            <BitButton IconName="Add" OnClick="NewEntry">New entry</BitButton>
+        </AuthorizeView>
     </header>
 
     <aside class="app-nav">

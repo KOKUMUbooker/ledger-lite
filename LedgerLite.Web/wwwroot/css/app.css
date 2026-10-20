@@ -1003,7 +1003,70 @@ code {
         grid-template-columns: 1fr;
     }
 
-        .guide-glossary dd {
-            margin-bottom: 8px;
-        }
+    .guide-glossary dd {
+        margin-bottom: 8px;
+    }
+}
+
+/* ---- Sign-in and access gate ---- */
+.signin-card, .gate-card {
+    max-width: 480px;
+    margin: 48px auto;
+    padding: 28px;
+    border: 1px solid var(--bit-clr-brd-pri, #c8c6c4);
+    border-radius: 12px;
+    text-align: center;
+}
+
+.signin-card h1, .gate-card h1 {
+    margin-top: 0;
+}
+
+.signin-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+/* ---- User menu ---- */
+.user-menu {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-name {
+    font-weight: 600;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.role-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.role-badge.owner {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.role-badge.visitor {
+    background: #e0f2fe;
+    color: #075985;
+}
+
+@media (max-width: 768px) {
+    .user-name {
+        display: none;
+    }
+
+    .signin-card, .gate-card {
+        margin: 24px 0;
+        padding: 20px;
+    }
 }

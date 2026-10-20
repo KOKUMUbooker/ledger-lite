@@ -1,10 +1,12 @@
 ﻿using LedgerLite.Application.Journal;
 using LedgerLite.Contracts;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LedgerLite.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/journal-entries")]
 public class JournalEntriesController : ControllerBase
 {

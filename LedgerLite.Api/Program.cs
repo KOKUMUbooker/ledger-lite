@@ -8,6 +8,17 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        // Load .env, searching upward from the working directory, BEFORE the builder reads configuration.
+        // NoClobber: variables already set in the real environment (on the server, say) win over the file.
+        try
+        {
+            DotNetEnv.Env.NoClobber().TraversePath().Load();
+        }
+        catch (FileNotFoundException)
+        {
+            // No .env file is fine: production can use real environment variables instead.
+        }
+
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);

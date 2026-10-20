@@ -6,7 +6,9 @@
 
 <PageHeader Title="Dashboard" Subtitle="The books at a glance.">
     <BitButton Variant="BitVariant.Outline" IconName="Refresh" IsEnabled="!_loading" OnClick="LoadAsync">Refresh</BitButton>
-    <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+    <AuthorizeView Roles="Owner">
+        <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+    </AuthorizeView>
 </PageHeader>
 
 <ErrorBanner @bind-Message="_error" />

@@ -4,32 +4,85 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LedgerLite.Web</title>
+    <title>LedgerLite · Double-entry ledger demo</title>
+    <meta name="description" content="LedgerLite is a demo of a double-entry ledger engine: accounts, balanced journal entries, reversals and a trial balance. Built by Booker Ochieng Okumu." />
     <base href="/" />
     <link rel="preload" id="webassembly" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="_content/Bit.BlazorUI/styles/bit.blazorui.css" rel="stylesheet" />
+    <link href="_content/Bit.BlazorUI.Icons/styles/bit.blazorui.icons.css" rel="stylesheet" />
     <script type="importmap"></script>
 </head>
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
-    </div>
+        <div style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          gap: 24px;
+        ">
+            <div class="ascii-container">
+                <pre class="ascii-art">
+ooooo                        .o8                                        ooooo         o8o      .             
+`888'                       "888                                        `888'         `"'    .o8             
+ 888          .ooooo.   .oooo888   .oooooooo  .ooooo.  oooo d8b          888         oooo  .o888oo  .ooooo.  
+ 888         d88' `88b d88' `888  888' `88b  d88' `88b `888""8P          888         `888    888   d88' `88b 
+ 888         888ooo888 888   888  888   888  888ooo888  888     8888888  888          888    888   888ooo888 
+ 888       o 888    .o 888   888  `88bod8P'  888    .o  888              888       o  888    888 . 888    .o 
+o888ooooood8 `Y8bod8P' `Y8bod88P" `8oooooo.  `Y8bod8P' d888b            o888ooooood8 o888o   "888" `Y8bod8P' 
+                                  d"     YD                                                                  
+                                  "Y88888P'                                                                  
+                                                                                                             
+                </pre>
+            </div>
+        </div>
+        </div>
 
-    <div id="blazor-error-ui">
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
-    </div>
+        <noscript>
+            <main style="max-width:640px;margin:48px auto;padding:0 16px;font-family:system-ui,sans-serif;line-height:1.6">
+                <h1>LedgerLite</h1>
+                <p>
+                    LedgerLite is a demo of a double-entry ledger engine: accounts, balanced journal entries,
+                    reversals and a trial balance. It uses fictional data and needs JavaScript to run.
+                </p>
+                <p>
+                    Built by Booker Ochieng Okumu &middot;
+                    <a href="/privacy.html">Privacy policy</a> &middot;
+                    <a href="https://bkokumu.com/">Portfolio</a> &middot;
+                    <a href="https://github.com/KOKUMUbooker/ledger-lite">Source code</a>
+                </p>
+            </main>
+        </noscript>
 
-    <script src="_content/Bit.BlazorUI/scripts/bit.blazorui.js"></script>
-    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+        <div id="blazor-error-ui">
+            An unhandled error has occurred.
+            <a href="." class="reload">Reload</a>
+            <span class="dismiss">🗙</span>
+        </div>
+
+        <style>
+            .ascii-container {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }
+
+            .ascii-art {
+                font-family: monospace;
+                font-weight: bolder;
+                white-space: pre;
+                line-height: 1;
+                font-size: clamp(4px, 1vw, 14px);
+                margin: 0;
+            }
+        </style>
+
+        <script src="_content/Bit.BlazorUI/scripts/bit.blazorui.js"></script>
+        <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 
 </html>

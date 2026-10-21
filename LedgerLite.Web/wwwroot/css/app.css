@@ -1120,3 +1120,46 @@ code {
         padding: 20px;
     }
 }
+
+/* ---- Footer and About ---- */
+.app-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    justify-content: space-between;
+    margin-top: 48px;
+    padding: 16px 0;
+    border-top: 1px solid var(--bit-clr-brd-pri, #d1d9e0);
+    font-size: 0.85rem;
+    color: var(--bit-clr-fg-sec, #605e5c);
+}
+
+.app-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+}
+
+.app-footer a {
+    color: inherit;
+}
+
+.creator-card {
+    border: 1px solid var(--bit-clr-brd-pri, #c8c6c4);
+    border-radius: 8px;
+    padding: 16px 20px;
+}
+
+.creator-card h3 {
+    margin: 0;
+}
+
+.about-links {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+}
+
+.about-links li {
+    margin-bottom: 4px;
+}

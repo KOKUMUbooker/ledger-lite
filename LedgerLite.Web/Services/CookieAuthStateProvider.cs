@@ -46,7 +46,9 @@ public sealed class CookieAuthStateProvider : AuthenticationStateProvider
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
-            // Api unreachable or an unexpected reply: treat as signed out
+            // Make failures non-sticky
+            // Don't remember a transient failure (rate limit, Api restarting): ask again next time
+            _state = null;
         }
 
         return Anonymous;

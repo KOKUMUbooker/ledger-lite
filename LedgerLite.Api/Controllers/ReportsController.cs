@@ -1,13 +1,16 @@
-﻿using LedgerLite.Application.Reports;
+﻿using LedgerLite.Api.RateLimiting;
+using LedgerLite.Application.Reports;
 using LedgerLite.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LedgerLite.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/reports")]
+[EnableRateLimiting(RateLimitingExtensions.Reads)]
 public class ReportsController : ControllerBase
 {
     private readonly GetTrialBalance _trialBalance;

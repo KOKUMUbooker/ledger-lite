@@ -1,5 +1,7 @@
 using LedgerLite.Api.Auth;
 using LedgerLite.Api.ErrorHandling;
+using LedgerLite.Api.Proxy;
+using LedgerLite.Api.RateLimiting;
 using LedgerLite.Application;
 using LedgerLite.Data;
 
@@ -22,19 +24,26 @@ public class Program
 
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);
-        builder.Services.AddLedgerApplication();
-
         builder.Services.AddControllers();
 
         // Errors: exceptions -> ProblemDetails JSON
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<LedgerExceptionHandler>();
+
+        builder.Services.AddLedgerData(builder.Configuration.GetConnectionString("LedgerDb")!);
+        builder.Services.AddLedgerApplication();
         builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
+        builder.Services.AddLedgerForwardedHeaders(builder.Configuration);
+        builder.Services.AddLedgerRateLimiting(builder.Configuration);
+
+        // Guard against oversized request bodies
+        builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024);
 
         builder.Services.AddOpenApi();
 
         var app = builder.Build();
+
+        app.UseForwardedHeaders();      // FIRST: everything after it sees the real client IP and scheme
 
         app.UseExceptionHandler();
 
@@ -51,6 +60,8 @@ public class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
+
+        app.UseRateLimiter();           // after authentication so it can key by user
 
         app.MapControllers();
 

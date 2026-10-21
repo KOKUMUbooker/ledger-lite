@@ -1,13 +1,16 @@
-﻿using LedgerLite.Application.Journal;
+﻿using LedgerLite.Api.RateLimiting;
+using LedgerLite.Application.Journal;
 using LedgerLite.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LedgerLite.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/journal-entries")]
+[EnableRateLimiting(RateLimitingExtensions.Reads)]
 public class JournalEntriesController : ControllerBase
 {
     private readonly PostJournalEntry _post;
@@ -45,6 +48,7 @@ public class JournalEntriesController : ControllerBase
     // POST /api/journal-entries
     // 201 = newly posted, 200 = the idempotency key matched an entry that was already posted
     [HttpPost]
+    [EnableRateLimiting(RateLimitingExtensions.Writes)]
     public async Task<ActionResult<JournalEntryDto>> Post(PostEntryRequest request, CancellationToken ct)
     {
         if (request.Date == default) return MissingDate();
@@ -74,6 +78,7 @@ public class JournalEntriesController : ControllerBase
 
     // POST /api/journal-entries/42/reverse
     [HttpPost("{id:int}/reverse")]
+    [EnableRateLimiting(RateLimitingExtensions.Writes)]
     public async Task<ActionResult<JournalEntryDto>> Reverse(int id, ReverseEntryRequest request, CancellationToken ct)
     {
         if (request.Date == default) return MissingDate();

@@ -1,15 +1,18 @@
-﻿using LedgerLite.Application.Accounts;
+﻿using LedgerLite.Api.RateLimiting;
+using LedgerLite.Application.Accounts;
 using LedgerLite.Application.Reports;
 using LedgerLite.Contracts;
 using LedgerLite.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LedgerLite.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/accounts")]
+[EnableRateLimiting(RateLimitingExtensions.Reads)]
 public class AccountsController : ControllerBase
 {
     private readonly ListAccounts _listAccounts;
@@ -40,6 +43,7 @@ public class AccountsController : ControllerBase
 
     // POST /api/accounts
     [HttpPost]
+    [EnableRateLimiting(RateLimitingExtensions.Writes)]
     public async Task<ActionResult<AccountDto>> Create(CreateAccountRequest request, CancellationToken ct)
     {
         if (!TryParseType(request.Type, out var type)) return InvalidType(request.Type);

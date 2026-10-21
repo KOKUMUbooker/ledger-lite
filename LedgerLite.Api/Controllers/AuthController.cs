@@ -1,10 +1,12 @@
-﻿using System.Security.Claims;
-using LedgerLite.Api.Auth;
+﻿using LedgerLite.Api.Auth;
+using LedgerLite.Api.RateLimiting;
 using LedgerLite.Contracts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 
 namespace LedgerLite.Api.Controllers;
 
@@ -21,6 +23,7 @@ public class AuthController : ControllerBase
     // Browser navigates here (a normal link, not fetch). Sends the user to the provider.
     [HttpGet("login/{provider}")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.SignIn)]
     public async Task<IActionResult> Login(
         string provider, [FromQuery] string? returnUrl, [FromServices] IAuthenticationSchemeProvider schemes)
     {
@@ -52,6 +55,7 @@ public class AuthController : ControllerBase
     // POST, so a third-party page can't sign you out with an image tag or a link
     [HttpPost("logout")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.SignIn)]
     public async Task<IActionResult> Logout()
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);

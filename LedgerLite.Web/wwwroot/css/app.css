@@ -1,6 +1,56 @@
-html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+/* Space Grotesk - Light (300) */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/fonts/SpaceGrotesk-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
 }
+
+/* Space Grotesk - Regular (400) */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/fonts/SpaceGrotesk-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Space Grotesk - Medium (500) */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/fonts/SpaceGrotesk-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Space Grotesk - SemiBold (600) */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/fonts/SpaceGrotesk-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Space Grotesk - Bold (700) */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('/fonts/SpaceGrotesk-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+html, body {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+}
+
+/*html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}*/
 
 h1:focus {
     outline: none;

@@ -1,0 +1,286 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy · LedgerLite</title>
+    <meta name="description" content="How LedgerLite, a personal portfolio demo of a double-entry ledger, handles your information when you sign in with Google or GitHub." />
+    <style>
+        :root {
+            --bg: #ffffff;
+            --fg: #1f2328;
+            --muted: #59636e;
+            --line: #d1d9e0;
+            --link: #0b57d0;
+            --panel: #f6f8fa;
+        }
+
+/*        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f1419;
+                --fg: #e6edf3;
+                --muted: #9aa7b4;
+                --line: #2d3742;
+                --link: #7ab0ff;
+                --panel: #161b22;
+            }
+        }*/
+
+        /* Space Grotesk - Light (300) */
+        @font-face {
+            font-family: 'Space Grotesk';
+            src: url('/fonts/SpaceGrotesk-Light.ttf') format('truetype');
+            font-weight: 300;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Space Grotesk - Regular (400) */
+        @font-face {
+            font-family: 'Space Grotesk';
+            src: url('/fonts/SpaceGrotesk-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Space Grotesk - Medium (500) */
+        @font-face {
+            font-family: 'Space Grotesk';
+            src: url('/fonts/SpaceGrotesk-Medium.ttf') format('truetype');
+            font-weight: 500;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Space Grotesk - SemiBold (600) */
+        @font-face {
+            font-family: 'Space Grotesk';
+            src: url('/fonts/SpaceGrotesk-SemiBold.ttf') format('truetype');
+            font-weight: 600;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Space Grotesk - Bold (700) */
+        @font-face {
+            font-family: 'Space Grotesk';
+            src: url('/fonts/SpaceGrotesk-Bold.ttf') format('truetype');
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        html, body {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 400;
+        }
+
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 24px 16px 64px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin: 8px 0 4px;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin: 32px 0 8px;
+        }
+
+        a {
+            color: var(--link);
+        }
+
+        .meta, .back {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            text-align: left;
+            vertical-align: top;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+        }
+
+        th {
+            background: var(--panel);
+        }
+
+        .note {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 16px;
+        }
+
+        @media (max-width: 600px) {
+            table {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <p class="back"><a href="/">&larr; Back to LedgerLite</a></p>
+
+        <h1>Privacy Policy</h1>
+        <p class="meta">Last updated: 21 October 2026</p>
+
+        <h2>1. Who I am</h2>
+        <p>
+            LedgerLite is a personal portfolio project created and run by Booker Ochieng Okumu ("I", "me"),
+            a software developer based in Nairobi, Kenya. I am the person responsible for the personal information
+            described in this policy. You can reach me at
+            <a href="mailto:booker20dev@gmail.com">booker20dev@gmail.com</a>.
+        </p>
+
+        <h2>2. What LedgerLite is</h2>
+        <p>
+            LedgerLite is a demonstration of a double-entry accounting ledger: accounts, journal entries, reversals
+            and a trial balance. It is not a financial service, it holds no real money, and the data in it is fictional.
+        </p>
+        <p class="note">
+            <strong>Please do not enter real personal or financial information into LedgerLite.</strong>
+            Signed-in visitors can only view the demo data. Only the project owner can add entries.
+        </p>
+
+        <h2>3. Information I handle</h2>
+        <table>
+            <thead>
+                <tr><th>Information</th><th>Why</th><th>Where it lives</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Your account identifier from Google or GitHub (an opaque ID, not your email)</td>
+                    <td>To recognise you while you are signed in</td>
+                    <td>In your sign-in cookie, in your browser</td>
+                </tr>
+                <tr>
+                    <td>Your public display name (your name on Google, or your username on GitHub)</td>
+                    <td>To show who is signed in</td>
+                    <td>In your sign-in cookie, in your browser</td>
+                </tr>
+                <tr>
+                    <td>Your role in LedgerLite (Owner or Visitor)</td>
+                    <td>To decide whether you can add entries or only view</td>
+                    <td>In your sign-in cookie, in your browser</td>
+                </tr>
+                <tr>
+                    <td>Technical data: IP address, browser type, pages requested, time of request</td>
+                    <td>Security, protection against abuse, and troubleshooting</td>
+                    <td>Briefly in the application's memory for rate limiting, and in standard web server and Cloudflare logs</td>
+                </tr>
+            </tbody>
+        </table>
+        <p>
+            <strong>What I do not collect.</strong> When you sign in with Google I ask only for the basic
+            <code>openid</code> and <code>profile</code> permissions. I do not request your email address, contacts,
+            files, calendar, location or any other data from Google or GitHub, and I do not keep your profile picture
+            or any other profile details. LedgerLite has no user database: your identifier and name are not stored in
+            the LedgerLite database.
+        </p>
+
+        <h2>4. How I use it</h2>
+        <ul>
+            <li>To sign you in and keep you signed in.</li>
+            <li>To decide whether you can view only, or also add and reverse entries.</li>
+            <li>To protect the site from abuse and keep it running, for example by limiting how many requests one address can make.</li>
+        </ul>
+        <p>I do not sell your information, use it for advertising, or build profiles about you.</p>
+
+        <h2>5. Sign-in with Google and GitHub</h2>
+        <p>
+            When you choose to sign in, you leave LedgerLite and authenticate on Google's or GitHub's own site, under
+            their privacy policies:
+            <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Google</a>,
+            <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">GitHub</a>.
+            They tell LedgerLite who you are; LedgerLite never sees your password.
+        </p>
+
+        <h2>6. Cookies</h2>
+        <p>LedgerLite uses only cookies that are necessary for it to work. It has no analytics or advertising cookies.</p>
+        <ul>
+            <li>
+                <strong>Sign-in cookie</strong> (<code>ledgerlite.auth</code>): keeps you signed in. It is not readable by
+                scripts, and it expires after about 8 hours of inactivity or when you sign out.
+            </li>
+            <li>
+                <strong>Short-lived sign-in security cookies</strong>: set while you are being sent to Google or GitHub and
+                back, to prevent forged sign-in requests. They are removed when the sign-in completes.
+            </li>
+        </ul>
+
+        <h2>7. Who I share information with</h2>
+        <p>I share information only with the services needed to run LedgerLite:</p>
+        <ul>
+            <li>Google and GitHub, to sign you in (see section 5).</li>
+            <li>Cloudflare and my hosting provider, which carry and serve the site's traffic and therefore process technical data such as your IP address on my behalf.</li>
+            <li>Anyone else only where the law requires it.</li>
+        </ul>
+        <p>
+            These providers may process data in countries other than Kenya.
+        </p>
+
+        <h2>8. How long I keep it</h2>
+        <ul>
+            <li>Your sign-in cookie stays in your browser until it expires or you sign out.</li>
+            <li>I keep no account records about you, so there is nothing to retain beyond that.</li>
+            <li>Server and Cloudflare logs are kept for a limited period for security and troubleshooting, then deleted.</li>
+        </ul>
+
+        <h2>9. Your choices</h2>
+        <ul>
+            <li><strong>Sign out</strong> at any time using the button in the app header. This removes the sign-in cookie.</li>
+            <li>
+                <strong>Remove LedgerLite's access</strong> from your account:
+                <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">Google account permissions</a>,
+                <a href="https://github.com/settings/applications" rel="noopener noreferrer">GitHub authorized apps</a>.
+            </li>
+        </ul>
+       
+        <h2>10. Security</h2>
+        <p>
+            The site is served over HTTPS, the sign-in cookie is protected from scripts, requests are rate limited, and
+            visitors cannot change any data. No system is perfectly secure, but I take reasonable steps to protect what
+            little information is involved.
+        </p>
+
+        <h2>11. Children</h2>
+        <p>LedgerLite is not directed at children under 13, and I do not knowingly collect information from them.</p>
+
+        <h2>12. Changes to this policy</h2>
+        <p>
+            If I change how LedgerLite handles information, I will update this page and the "Last updated" date above.
+        </p>
+
+        <h2>13. Contact</h2>
+        <p>
+            Booker Ochieng Okumu &middot;
+            <a href="mailto:booker20dev@gmail.com">booker20dev@gmail.com</a> &middot;
+            <a href="https://bkokumu.com/" rel="noopener noreferrer">bkokumu.com</a> &middot;
+            <a href="https://github.com/KOKUMUbooker/ledger-lite" rel="noopener noreferrer">Source code on GitHub</a>
+        </p>
+    </main>
+</body>
+</html>

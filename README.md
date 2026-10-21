@@ -8,7 +8,7 @@
 
 LedgerLite records financial events as balanced journal entries, derives every balance from them, and corrects
 mistakes with reversals instead of edits. It is a portfolio project: the data is fictional, no real money is
-involved, and it is not affiliated with any bank, SACCO or employer.
+involved.
 
 <!-- Add after deployment:
 **Live demo:** https://your-domain

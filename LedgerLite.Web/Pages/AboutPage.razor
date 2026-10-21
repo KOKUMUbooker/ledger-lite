@@ -1,0 +1,69 @@
+﻿@page "/about"
+@attribute [AllowAnonymous]
+
+<PageTitle>About · LedgerLite</PageTitle>
+
+<PageHeader Title="About LedgerLite"
+            Subtitle="A double-entry ledger engine, built from scratch to learn how core banking ledgers work." />
+
+<article class="guide">
+
+    <section>
+        <h2>The project</h2>
+        <p>
+            LedgerLite is a personal project. It covers the heart of a core banking ledger: a chart of
+            accounts, balanced journal entries, reversals instead of edits, derived balances, account ledgers with
+            running balances, and a trial balance. The <a href="/how-it-works">How it works</a> page explains the
+            accounting behind it.
+        </p>
+        <p>
+            It is a demo with fictional data. It is not a financial service and holds no real money.
+        </p>
+    </section>
+
+    <section>
+        <h2>Built with</h2>
+        <ul>
+            <li>C# and .NET 10, with a layered design: Domain, Data, Application, Contracts, Api, Web</li>
+            <li>ASP.NET Core Web API (controllers), which also hosts the web app</li>
+            <li>EF Core with SQL Server</li>
+            <li>Blazor WebAssembly with the Bit BlazorUI component library</li>
+            <li>Cookie sign-in with Google and GitHub, plus rate limiting</li>
+        </ul>
+    </section>
+
+    <section>
+        <h2>Created by</h2>
+        <div class="creator-card">
+            <h3>Booker Ochieng Okumu</h3>
+            <p class="muted">Full-stack software developer, Nairobi, Kenya</p>
+            <ul class="about-links">
+                <li>
+                    Portfolio:
+                    <a href="https://bkokumu.com/" target="_blank" rel="noopener noreferrer">bkokumu.com</a>
+                </li>
+                <li>
+                    GitHub:
+                    <a href="https://github.com/KOKUMUbooker" target="_blank" rel="noopener noreferrer">github.com/KOKUMUbooker</a>
+                </li>
+                <li>
+                    Source code:
+                    <a href="https://github.com/KOKUMUbooker/ledger-lite" target="_blank" rel="noopener noreferrer">github.com/KOKUMUbooker/ledger-lite</a>
+                </li>
+                <li>
+                    Email:
+                    <a href="mailto:booker20dev@gmail.com">booker20dev@gmail.com</a>
+                </li>
+            </ul>
+        </div>
+    </section>
+
+    <section>
+        <h2>Privacy</h2>
+        <p>
+            What LedgerLite does with your sign-in information is in the
+            <a href="/privacy.html" target="_blank" rel="noopener">privacy policy</a>.
+        </p>
+    </section>
+
+</article>

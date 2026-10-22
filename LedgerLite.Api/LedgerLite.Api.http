@@ -650,16 +650,14 @@ Content-Type: application/json
 ### Deposit cash (expect 201; repeat the same Idempotency-Key and you get 200 with the same entry)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/deposit
 Content-Type: application/json
-Idempotency-Key: dep-jane-0001
 
-{ "amount": 5000.00, "narration": "Opening deposit" }
+{ "amount": 5000.00, "narration": "Opening deposit", Idempotency-Key: dep-jane-0001 }
 
 ### Withdraw cash (expect 201)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw
 Content-Type: application/json
-Idempotency-Key: wdr-jane-0001
 
-{ "amount": 1200.00 }
+{ "amount": 1200.00, Idempotency-Key: wdr-jane-0001 }
 
 ### Withdraw more than the balance (expect 422 InsufficientFunds)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw

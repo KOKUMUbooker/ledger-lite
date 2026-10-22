@@ -25,6 +25,8 @@ public class SavingsController : ControllerBase
         _withdraw = withdraw;
     }
 
+
+
     // POST /api/savings/accounts   { "customerName": "Oliver Twist" }
     [HttpPost("accounts")]
     public async Task<ActionResult<AccountDto>> Open(OpenSavingsAccountRequest request, CancellationToken ct)
@@ -33,26 +35,22 @@ public class SavingsController : ControllerBase
         return CreatedAtAction(nameof(Open), new { id = account.Id }, account.ToDto());
     }
 
-    // POST /api/savings/accounts/7/deposit   Idempotency-Key: dep-123
     [HttpPost("accounts/{id:int}/deposit")]
     public async Task<ActionResult<JournalEntryDto>> Deposit(
-        int id, CashMovementRequest request,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey, CancellationToken ct)
+        int id, CashMovementRequest request, CancellationToken ct)
     {
-        var result = await _deposit.ExecuteAsync(ToCommand(id, request, idempotencyKey), ct);
+        var result = await _deposit.ExecuteAsync(ToCommand(id, request), ct);
         return result.WasDuplicate ? Ok(result.Entry.ToDto()) : StatusCode(201, result.Entry.ToDto());
     }
 
-    // POST /api/savings/accounts/7/withdraw   Idempotency-Key: wdr-123
     [HttpPost("accounts/{id:int}/withdraw")]
     public async Task<ActionResult<JournalEntryDto>> Withdraw(
-        int id, CashMovementRequest request,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey, CancellationToken ct)
+        int id, CashMovementRequest request, CancellationToken ct)
     {
-        var result = await _withdraw.ExecuteAsync(ToCommand(id, request, idempotencyKey), ct);
+        var result = await _withdraw.ExecuteAsync(ToCommand(id, request), ct);
         return result.WasDuplicate ? Ok(result.Entry.ToDto()) : StatusCode(201, result.Entry.ToDto());
     }
 
-    private static CashMovementCommand ToCommand(int id, CashMovementRequest r, string? key) =>
-        new(id, r.Amount, r.Date ?? DateOnly.FromDateTime(DateTime.UtcNow), r.Narration, key);
+    private static CashMovementCommand ToCommand(int id, CashMovementRequest r) =>
+        new(id, r.Amount, r.Date ?? DateOnly.FromDateTime(DateTime.UtcNow), r.Narration, r.IdempotencyKey);
 }

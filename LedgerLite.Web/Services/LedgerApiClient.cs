@@ -25,9 +25,15 @@ public class LedgerApiClient
         (await SendAsync<AccountDto>(HttpMethod.Post, "api/accounts", request, ct)).Value;
 
     public async Task<AccountLedgerDto> GetLedgerAsync(
-        int accountId, DateOnly? from = null, DateOnly? to = null, CancellationToken ct = default) =>
+        int accountId, DateOnly? from = null, DateOnly? to = null,
+        int page = 1, int pageSize = 50, CancellationToken ct = default) =>
         (await SendAsync<AccountLedgerDto>(
-            HttpMethod.Get, Url($"api/accounts/{accountId}/ledger", ("from", D(from)), ("to", D(to))), null, ct)).Value;
+            HttpMethod.Get,
+            Url($"api/accounts/{accountId}/ledger",
+                ("from", D(from)), ("to", D(to)),
+                ("page", page.ToString(CultureInfo.InvariantCulture)),
+                ("pageSize", pageSize.ToString(CultureInfo.InvariantCulture))),
+            null, ct)).Value;
 
     public async Task<AccountDto> SetAccountActiveAsync(int accountId, bool active, CancellationToken ct = default) =>
         (await SendAsync<AccountDto>(

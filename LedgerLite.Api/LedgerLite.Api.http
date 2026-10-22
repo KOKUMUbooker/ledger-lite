@@ -620,3 +620,20 @@ POST {{host}}/api/accounts/99999/deactivate
 ### As a Visitor (expect 403)
 # First: GET {{host}}/api/auth/dev-login?role=visitor
 POST {{host}}/api/accounts/1/deactivate
+
+### ---------------- Ledger paging ----------------
+
+### Cash ledger, first page of 2
+GET {{host}}/api/accounts/1/ledger?page=1&pageSize=2
+
+### Second page: broughtForward carries the balance from page 1
+GET {{host}}/api/accounts/1/ledger?page=2&pageSize=2
+
+### Paged with a date range (opening balance, then brought forward per page)
+GET {{host}}/api/accounts/1/ledger?from=2026-10-16&page=1&pageSize=2
+
+### Page past the end (expect empty lines, totals still correct)
+GET {{host}}/api/accounts/1/ledger?page=999
+
+### Out-of-range paging is clamped (expect page 1, pageSize 200)
+GET {{host}}/api/accounts/1/ledger?page=0&pageSize=100000

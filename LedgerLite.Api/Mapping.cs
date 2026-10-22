@@ -40,6 +40,8 @@ internal static class Mapping
         l.AccountId, l.Code, l.Name, l.Type.ToString(), NormalBalanceOf(l.Type),
         l.From, l.To,
         l.OpeningBalance,
+        l.Page, l.PageSize, l.TotalLines,
+        l.BroughtForward,
         l.Lines.Select(x => new LedgerLineDto(
             x.Date, x.EntryId, x.Description, x.Reference, x.Debit, x.Credit, x.RunningBalance)).ToList(),
         l.TotalDebits, l.TotalCredits,

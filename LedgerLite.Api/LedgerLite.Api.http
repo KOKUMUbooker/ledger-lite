@@ -582,3 +582,58 @@ GET {{host}}/api/does-not-exist
 
 ### Wrong method on a route (expect 405)
 DELETE {{host}}/api/journal-entries/1
+
+### ---------------- Deactivate and activate accounts ----------------
+
+### Deactivate an account with a balance (expect 422 AccountHasBalance)
+# Run after the deposit examples: Cash has a balance.
+POST {{host}}/api/accounts/1/deactivate
+
+### Deactivate a parent that has an active sub-account (expect 422 AccountHasActiveChildren)
+# Customer Deposits (3) has the 2001 sub-account from the create example.
+POST {{host}}/api/accounts/3/deactivate
+
+### Deactivate a zero-balance account (expect 200, isActive false)
+# Create a throwaway account first, then use its id.
+POST {{host}}/api/accounts/{{createAccount.response.body.$.id}}/deactivate
+
+### Post to the inactive account (expect 422 AccountInactive)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-18",
+  "description": "Posting to an inactive account",
+  "reference": "INACTIVE-1",
+  "lines": [
+    { "accountId": 1, "debit": 10, "credit": 0 },
+    { "accountId": {{createAccount.response.body.$.id}}, "debit": 0, "credit": 10 }
+  ]
+}
+
+### Activate it again (expect 200, isActive true)
+POST {{host}}/api/accounts/{{createAccount.response.body.$.id}}/activate
+
+### Unknown account (expect 404)
+POST {{host}}/api/accounts/99999/deactivate
+
+### As a Visitor (expect 403)
+# First: GET {{host}}/api/auth/dev-login?role=visitor
+POST {{host}}/api/accounts/1/deactivate
+
+### ---------------- Ledger paging ----------------
+
+### Cash ledger, first page of 2
+GET {{host}}/api/accounts/1/ledger?page=1&pageSize=2
+
+### Second page: broughtForward carries the balance from page 1
+GET {{host}}/api/accounts/1/ledger?page=2&pageSize=2
+
+### Paged with a date range (opening balance, then brought forward per page)
+GET {{host}}/api/accounts/1/ledger?from=2026-10-16&page=1&pageSize=2
+
+### Page past the end (expect empty lines, totals still correct)
+GET {{host}}/api/accounts/1/ledger?page=999
+
+### Out-of-range paging is clamped (expect page 1, pageSize 200)
+GET {{host}}/api/accounts/1/ledger?page=0&pageSize=100000

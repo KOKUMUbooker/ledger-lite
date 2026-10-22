@@ -79,7 +79,7 @@ else
             </div>
         </div>
 
-        @if (_ledger.Lines.Count == 0)
+        @if (_ledger.TotalLines == 0)
         {
             <p class="empty-state">No postings in this period.</p>
         }
@@ -99,7 +99,14 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                        @if (_ledger.From is not null)
+                        @if (_ledger.Page > 1)
+                        {
+                            <tr class="group-row">
+                                <td colspan="6">Brought forward from the previous page</td>
+                                <td class="num">@Fmt.Money(_ledger.BroughtForward)</td>
+                            </tr>
+                        }
+                        else if (_ledger.From is not null)
                         {
                             <tr class="group-row">
                                 <td colspan="6">Opening balance</td>
@@ -123,13 +130,23 @@ else
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="4">Period totals and closing balance</td>
+                            <td colspan="4">Totals and closing balance for the whole period</td>
                             <td class="num">@Fmt.Money(_ledger.TotalDebits)</td>
                             <td class="num">@Fmt.Money(_ledger.TotalCredits)</td>
                             <td class="num">@Fmt.Money(_ledger.ClosingBalance)</td>
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+            <div class="pager">
+                <span class="muted">Showing @FirstShown–@LastShown of @_ledger.TotalLines lines</span>
+                <div class="pager-buttons">
+                    <BitButton Variant="BitVariant.Outline" IsEnabled="@(_page > 1 && !_loading)"
+                               OnClick="() => GoToPage(_page - 1)">Previous</BitButton>
+                    <span>Page @_page of @TotalPages</span>
+                    <BitButton Variant="BitVariant.Outline" IsEnabled="@(_page < TotalPages && !_loading)"
+                               OnClick="() => GoToPage(_page + 1)">Next</BitButton>
+                </div>
             </div>
         }
     </div>
@@ -148,6 +165,20 @@ else
     private CancellationTokenSource? _cts;
 
     private string Title => _ledger is null ? "Account ledger" : $"{_ledger.Code} · {_ledger.Name}";
+
+    private const int PageSize = 50;
+    private int _page = 1;
+
+    private int TotalPages => _ledger is null ? 1 : Math.Max(1, (int)Math.Ceiling(_ledger.TotalLines / (double)PageSize));
+    private int FirstShown => _ledger is null || _ledger.Lines.Count == 0 ? 0 : (_ledger.Page - 1) * PageSize + 1;
+    private int LastShown => FirstShown == 0 ? 0 : FirstShown + _ledger!.Lines.Count - 1;
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1 || page > TotalPages || page == _page) return;
+        _page = page;
+        await LoadAsync();
+    }
 
     // The normal balance comes from the server; the wording only explains it
     private string Subtitle
@@ -186,7 +217,7 @@ else
 
         try
         {
-            var result = await Api.GetLedgerAsync(Id, ToDate(_from), ToDate(_to), cts.Token);
+            var result = await Api.GetLedgerAsync(Id, ToDate(_from), ToDate(_to), _page, PageSize, cts.Token);
 
             if (!cts.IsCancellationRequested)
                 _ledger = result;

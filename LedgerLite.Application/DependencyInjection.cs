@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<ListAccounts>();
         services.AddScoped<GetJournalEntry>();
         services.AddScoped<ListJournalEntries>();
+        services.AddScoped<SetAccountActive>();
         return services;
     }
 }

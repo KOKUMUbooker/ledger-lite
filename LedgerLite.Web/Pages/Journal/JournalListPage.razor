@@ -6,7 +6,9 @@
 <PageTitle>Journal · LedgerLite</PageTitle>
 
 <PageHeader Title="Journal" Subtitle="Every posted entry, newest first.">
-    <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+    <AuthorizeView Roles="Owner">
+        <BitButton Color="BitColor.Primary" IconName="Add" Href="/journal/new">New entry</BitButton>
+    </AuthorizeView>
 </PageHeader>
 
 <div class="filters">

@@ -1,0 +1,126 @@
+﻿@page "/savings"
+@inject LedgerApiClient Api
+
+<PageTitle>Savings · LedgerLite</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Savings</h1>
+        <p class="muted">
+            One sub-account per customer under Customer Deposits. Money a customer holds with us is a liability:
+            a deposit increases what we owe them, a withdrawal decreases it.
+        </p>
+    </div>
+    <AuthorizeView Roles="Owner">
+        <BitButton Color="BitColor.Primary" OnClick="() => _openDialog = true">Open account</BitButton>
+    </AuthorizeView>
+</div>
+
+@if (_success is not null)
+{
+    <BitMessage Color="BitColor.Success" Dismissible="true" OnDismiss="() => _success = null">@_success</BitMessage>
+}
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading)
+{
+    <BitSpinner Label="Loading savings accounts…" />
+}
+else if (_accounts.Count == 0)
+{
+    <p class="muted">No savings accounts yet.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Customer account</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var account in _accounts)
+                {
+                    <tr class="@(account.IsActive ? null : "row-inactive")">
+                        <td>@account.Code</td>
+                        <td>@account.Name</td>
+                        <td>@(account.IsActive ? "Active" : "Inactive")</td>
+                        <td class="row-actions">
+                            <a href="/accounts/@account.Id/ledger" target="_self">Statement</a>
+                            <AuthorizeView Roles="Owner">
+                                @if (account.IsActive)
+                                {
+                                    <button type="button" class="link-button" @onclick="() => Start(account, true)">Deposit</button>
+                                    <button type="button" class="link-button" @onclick="() => Start(account, false)">Withdraw</button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<OpenSavingsDialog @bind-IsOpen="_openDialog" OnOpened="OnOpened" />
+
+<CashMovementDialog @bind-IsOpen="_moveDialog"
+                    Account="_target"
+                    IsDeposit="_isDeposit"
+                    OnPosted="OnPosted" />
+
+@code {
+    private List<AccountDto> _accounts = new();
+    private AccountDto? _target;
+    private bool _isDeposit;
+    private bool _openDialog;
+    private bool _moveDialog;
+    private bool _loading = true;
+    private string? _error;
+    private string? _success;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            // Savings accounts are the SAV- sub-accounts created by "Open account"
+            var all = await Api.ListAccountsAsync();
+            _accounts = all.Where(a => a.Code.StartsWith("SAV-", StringComparison.Ordinal))
+                           .OrderBy(a => a.Code).ToList();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Start(AccountDto account, bool deposit)
+    {
+        _target = account;
+        _isDeposit = deposit;
+        _moveDialog = true;
+    }
+
+    private async Task OnOpened(AccountDto account)
+    {
+        _success = $"Opened {account.Code} · {account.Name}.";
+        await LoadAsync();
+    }
+
+    private Task OnPosted(string message)
+    {
+        _success = message;
+        return Task.CompletedTask;
+    }
+}

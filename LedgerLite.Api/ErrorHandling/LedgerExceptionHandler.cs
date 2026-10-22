@@ -17,6 +17,7 @@ public class LedgerExceptionHandler : IExceptionHandler
             DuplicateAccountCodeException or EntryAlreadyReversedException
                 => (StatusCodes.Status409Conflict, "Conflict"),
             AccountInactiveException or InvalidParentAccountException
+                or AccountHasBalanceException or AccountHasActiveChildrenException
                 => (StatusCodes.Status422UnprocessableEntity, "Business rule violated"),
             DomainException
                 => (StatusCodes.Status400BadRequest, "Invalid request"),

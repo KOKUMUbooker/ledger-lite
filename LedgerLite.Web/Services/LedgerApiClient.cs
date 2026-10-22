@@ -29,6 +29,10 @@ public class LedgerApiClient
         (await SendAsync<AccountLedgerDto>(
             HttpMethod.Get, Url($"api/accounts/{accountId}/ledger", ("from", D(from)), ("to", D(to))), null, ct)).Value;
 
+    public async Task<AccountDto> SetAccountActiveAsync(int accountId, bool active, CancellationToken ct = default) =>
+        (await SendAsync<AccountDto>(
+            HttpMethod.Post, $"api/accounts/{accountId}/{(active ? "activate" : "deactivate")}", null, ct)).Value;
+
     // ---- Journal ----
 
     public async Task<PagedResultDto<JournalEntrySummaryDto>> ListEntriesAsync(

@@ -74,8 +74,14 @@ else if (_loaded)
                             <td>@account.NormalBalance</td>
                             <td>@ParentText(account)</td>
                             <td>@(account.IsActive ? "Active" : "Inactive")</td>
-                            <td>
+                            <td class="row-actions">
                                 <a href="/accounts/@account.Id/ledger" @onclick:stopPropagation="true">Ledger</a>
+                                <AuthorizeView Roles="Owner">
+                                    <button type="button" class="link-button"
+                                            @onclick="() => AskToggle(account)" @onclick:stopPropagation="true">
+                                        @(account.IsActive ? "Deactivate" : "Activate")
+                                    </button>
+                                </AuthorizeView>
                             </td>
                         </tr>
                     }
@@ -86,6 +92,41 @@ else if (_loaded)
 }
 
 <AccountFormDialog @bind-IsOpen="_dialogOpen" Accounts="_accounts" OnCreated="OnCreated" />
+
+<BitModal @bind-IsOpen="_confirmOpen" Blocking="true">
+    <div class="dialog">
+        @if (_target is not null)
+        {
+            <h2 class="dialog-title">@(_target.IsActive ? "Deactivate" : "Activate") account?</h2>
+
+            <p>
+                <strong>@_target.Code · @_target.Name</strong>
+            </p>
+            <p class="muted">
+                @if (_target.IsActive)
+                {
+                    <text>
+                        No new entries can be posted to it. Its history stays, and you can activate it again later.
+                        It needs a zero balance and no active sub-accounts.
+                    </text>
+                }
+                else
+                {
+                    <text>It will be available for posting again.</text>
+                }
+            </p>
+
+            <ErrorBanner @bind-Message="_toggleError" />
+
+            <div class="dialog-actions">
+                <BitButton Variant="BitVariant.Outline" IsEnabled="!_toggling" OnClick="CancelToggle">Cancel</BitButton>
+                <BitButton Color="BitColor.Primary" IsLoading="_toggling" OnClick="ConfirmToggle">
+                    @(_target.IsActive ? "Deactivate" : "Activate")
+                </BitButton>
+            </div>
+        }
+    </div>
+</BitModal>
 
 @code {
     private static readonly List<BitDropdownItem<string>> _typeItems = new()
@@ -107,6 +148,10 @@ else if (_loaded)
     private bool _loading = true;
     private bool _loaded;
     private bool _dialogOpen;
+    private AccountDto? _target;
+    private bool _confirmOpen;
+    private bool _toggling;
+    private string? _toggleError;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -164,5 +209,44 @@ else if (_loaded)
         _error = null;
         _success = $"Account {created.Code} · {created.Name} created.";
         await LoadAsync();
+    }
+
+    private void AskToggle(AccountDto account)
+    {
+        _target = account;
+        _toggleError = null;
+        _confirmOpen = true;
+    }
+
+
+    private void CancelToggle()
+    {
+        if (!_toggling) _confirmOpen = false;
+    }
+
+    private async Task ConfirmToggle()
+    {
+        if (_target is null || _toggling) return;
+
+        _toggling = true;
+        _toggleError = null;
+        try
+        {
+            var updated = await Api.SetAccountActiveAsync(_target.Id, !_target.IsActive);
+
+            _confirmOpen = false;
+            _error = null;
+            _success = $"Account {updated.Code} · {updated.Name} {(updated.IsActive ? "activated" : "deactivated")}.";
+            await LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            // Stays open and explains, e.g. "Account 1000 still has a balance of 3,000.00..."
+            _toggleError = ex.Message;
+        }
+        finally
+        {
+            _toggling = false;
+        }
     }
 }

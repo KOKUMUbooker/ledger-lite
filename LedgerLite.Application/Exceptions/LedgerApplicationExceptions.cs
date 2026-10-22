@@ -1,4 +1,6 @@
-﻿namespace LedgerLite.Application.Exceptions;
+﻿using System.Globalization;
+
+namespace LedgerLite.Application.Exceptions;
 
 /// Base type so the Api layer can map all "expected" failures to 4xx responses.
 public abstract class LedgerApplicationException : Exception
@@ -16,6 +18,20 @@ public class AccountInactiveException : LedgerApplicationException
 {
     public AccountInactiveException(string code)
         : base($"Account {code} is inactive and cannot receive postings.") { }
+}
+
+public class AccountHasBalanceException : LedgerApplicationException
+{
+    public AccountHasBalanceException(string code, decimal balance)
+        : base($"Account {code} still has a balance of {balance.ToString("N2", CultureInfo.InvariantCulture)}. " +
+               "Bring it to zero before deactivating.")
+    { }
+}
+
+public class AccountHasActiveChildrenException : LedgerApplicationException
+{
+    public AccountHasActiveChildrenException(string code)
+        : base($"Account {code} has active sub-accounts. Deactivate them first.") { }
 }
 
 public class DuplicateAccountCodeException : LedgerApplicationException

@@ -8,6 +8,8 @@ public record AccountLedgerDto(
     int AccountId, string Code, string Name, string Type, string NormalBalance,
     DateOnly? From, DateOnly? To,
     decimal OpeningBalance,
+    int Page, int PageSize, int TotalLines,
+    decimal BroughtForward,
     IReadOnlyList<LedgerLineDto> Lines,
     decimal TotalDebits, decimal TotalCredits,
     decimal ClosingBalance);

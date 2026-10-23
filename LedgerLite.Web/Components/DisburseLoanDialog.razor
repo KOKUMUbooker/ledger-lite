@@ -1,0 +1,138 @@
+﻿@using System.Globalization
+@inject LedgerApiClient Api
+
+<BitModal IsOpen="IsOpen" Blocking="true">
+    <div class="dialog">
+        <h2 class="dialog-title">Disburse loan</h2>
+        <p class="muted">
+            Pays the principal out of Cash and opens two sub-accounts for the loan:
+            one for the principal and one for the interest the customer owes.
+        </p>
+
+        <BitTextField @bind-Value="CustomerName" Label="Customer name" Placeholder="e.g. Jane Wanjiru"
+                      Required MaxLength="80" Immediate />
+
+        <BitTextField @bind-Value="Principal" Label="Principal" Placeholder="10,000.00"
+                      Required MaxLength="15" Immediate ErrorMessage="@PrincipalError" />
+
+        <BitTextField @bind-Value="Rate" Label="Annual interest rate (%)" Placeholder="12"
+                      Required MaxLength="6" Immediate ErrorMessage="@RateError" />
+
+        <BitTextField @bind-Value="Term" Label="Term (months)" Placeholder="12"
+                      Required MaxLength="3" Immediate ErrorMessage="@TermError" />
+
+        <ErrorBanner @bind-Message="_error" />
+
+        <div class="dialog-actions">
+            <BitButton Variant="BitVariant.Outline" IsEnabled="!_busy" OnClick="Cancel">Cancel</BitButton>
+            <BitButton Color="BitColor.Primary" IsLoading="_busy" IsEnabled="CanSubmit" OnClick="Submit">Disburse</BitButton>
+        </div>
+    </div>
+</BitModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<LoanSummaryDto> OnDisbursed { get; set; }
+
+    private string? _name, _principal, _rate, _term, _error;
+    private decimal? _principalValue, _rateValue;
+    private int? _termValue;
+    private bool _busy, _wasOpen;
+    private string _key = NewKey();
+
+    private static string NewKey() => $"ldb-{Guid.NewGuid():N}";
+
+    // Any edit is a new attempt, so it gets a new idempotency key
+    private string? CustomerName { get => _name; set { _name = value; _key = NewKey(); } }
+
+    private string? Principal
+    {
+        get => _principal;
+        set { _principal = value; _key = NewKey(); _principalValue = ParseDecimal(value); }
+    }
+
+    private string? Rate
+    {
+        get => _rate;
+        set { _rate = value; _key = NewKey(); _rateValue = ParseDecimal(value); }
+    }
+
+    private string? Term
+    {
+        get => _term;
+        set
+        {
+            _term = value; _key = NewKey();
+            _termValue = int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var t) ? t : null;
+        }
+    }
+
+    private static decimal? ParseDecimal(string? text) =>
+        decimal.TryParse(text?.Replace(",", ""), NumberStyles.Number, CultureInfo.InvariantCulture, out var d) ? d : null;
+
+    private string? PrincipalError =>
+        string.IsNullOrWhiteSpace(_principal) ? null
+        : _principalValue is null ? "Enter a number, e.g. 10000.00"
+        : _principalValue <= 0 ? "Must be greater than zero"
+        : decimal.Round(_principalValue.Value, 2) != _principalValue ? "At most 2 decimal places"
+        : null;
+
+    private string? RateError =>
+        string.IsNullOrWhiteSpace(_rate) ? null
+        : _rateValue is null ? "Enter a number, e.g. 12"
+        : _rateValue is < 0 or > 100 ? "Between 0 and 100"
+        : decimal.Round(_rateValue.Value, 2) != _rateValue ? "At most 2 decimal places"
+        : null;
+
+    private string? TermError =>
+        string.IsNullOrWhiteSpace(_term) ? null
+        : _termValue is null ? "Whole months only"
+        : _termValue is < 1 or > 360 ? "Between 1 and 360"
+        : null;
+
+    private bool CanSubmit =>
+        !string.IsNullOrWhiteSpace(_name) &&
+        _principalValue is not null && PrincipalError is null &&
+        _rateValue is not null && RateError is null &&
+        _termValue is not null && TermError is null;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            _name = _principal = _rate = _term = _error = null;
+            _principalValue = _rateValue = null;
+            _termValue = null;
+            _key = NewKey();
+        }
+        _wasOpen = IsOpen;
+    }
+
+    private Task Cancel() => _busy ? Task.CompletedTask : IsOpenChanged.InvokeAsync(false);
+
+    private async Task Submit()
+    {
+        if (_busy || !CanSubmit) return;
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var loan = await Api.DisburseLoanAsync(new DisburseLoanRequest(
+                _name!.Trim(), _principalValue!.Value, _rateValue!.Value, _termValue!.Value,
+                null, _key));
+
+            await IsOpenChanged.InvokeAsync(false);
+            await OnDisbursed.InvokeAsync(loan);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

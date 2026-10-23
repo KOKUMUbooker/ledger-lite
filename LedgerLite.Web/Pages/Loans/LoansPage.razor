@@ -1,0 +1,89 @@
+﻿@page "/loans"
+@inject LedgerApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Loans · LedgerLite</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Loans</h1>
+        <p class="muted">
+            Each loan has a principal account and an interest-receivable account. Balances are always worked out from
+            the ledger, never stored.
+        </p>
+    </div>
+    <AuthorizeView Roles="Owner">
+        <BitButton Color="BitColor.Primary" OnClick="() => _dialog = true">Disburse loan</BitButton>
+    </AuthorizeView>
+</div>
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Loading loans…" />
+}
+else if (_loans.Count == 0)
+{
+    <p class="muted">No loans yet.</p>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Customer</th>
+                    <th>Disbursed</th>
+                    <th class="num">Principal</th>
+                    <th class="num">Rate</th>
+                    <th class="num">Principal due</th>
+                    <th class="num">Interest due</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in _loans)
+                {
+                    <tr>
+                        <td><a href="/loans/@s.Loan.Id">@s.Loan.CustomerName</a></td>
+                        <td>@s.Loan.DisbursedOn.ToString("yyyy-MM-dd")</td>
+                        <td class="num">@Fmt.Money(s.Loan.PrincipalAmount)</td>
+                        <td class="num">@s.Loan.AnnualRatePercent.ToString("0.##")%</td>
+                        <td class="num">@Fmt.Money(s.PrincipalOutstanding)</td>
+                        <td class="num">@Fmt.Money(s.InterestOutstanding)</td>
+                        <td><span class="badge @(s.IsSettled ? "badge-muted" : "badge-active")">@(s.IsSettled ? "Settled" : "Active")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<DisburseLoanDialog @bind-IsOpen="_dialog" OnDisbursed="OnDisbursed" />
+
+@code {
+    private List<LoanSummaryDto> _loans = new();
+    private bool _loading = true;
+    private bool _dialog;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _loans = await Api.ListLoansAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // Straight to the new loan: that's where you repay and accrue
+    private void OnDisbursed(LoanSummaryDto loan) => Nav.NavigateTo($"/loans/{loan.Loan.Id}");
+}

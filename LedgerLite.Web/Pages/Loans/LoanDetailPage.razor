@@ -1,0 +1,246 @@
+﻿@page "/loans/{Id:int}"
+@using System.Globalization
+@inject LedgerApiClient Api
+
+<PageTitle>Loan @Id · LedgerLite</PageTitle>
+
+<p><a href="/loans">← All loans</a></p>
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_success is not null)
+{
+    <BitMessage Color="BitColor.Success" Dismissible="true" OnDismiss="() => _success = null">@_success</BitMessage>
+}
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Loading loan…" />
+}
+else if (_s is not null)
+{
+    var loan = _s.Loan;
+
+    <div class="page-header">
+        <div>
+            <h1>@loan.CustomerName</h1>
+            <p class="muted">
+                @Fmt.Money(loan.PrincipalAmount) at @loan.AnnualRatePercent.ToString("0.##")% for @loan.TermMonths months,
+                disbursed @loan.DisbursedOn.ToString("yyyy-MM-dd")
+            </p>
+        </div>
+        <span class="badge @(_s.IsSettled ? "badge-muted" : "badge-active")">@(_s.IsSettled ? "Settled" : "Active")</span>
+    </div>
+
+    <div class="loan-stats">
+        <div class="stat">
+            <div class="stat-label">Principal outstanding</div>
+            <div class="stat-value">@Fmt.Money(_s.PrincipalOutstanding)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Interest outstanding</div>
+            <div class="stat-value">@Fmt.Money(_s.InterestOutstanding)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Total to settle</div>
+            <div class="stat-value">@Fmt.Money(_s.TotalOutstanding)</div>
+        </div>
+    </div>
+
+    <p>
+        <a href="/accounts/@loan.PrincipalAccountId/ledger">Principal statement</a> ·
+        <a href="/accounts/@loan.InterestAccountId/ledger">Interest statement</a>
+    </p>
+
+    <AuthorizeView Roles="Owner">
+        <div class="form-card">
+            <h2>Accrue interest</h2>
+            <p class="muted">
+                Interest earned for the month, on the principal outstanding at the period end. Accruing the same month
+                twice posts nothing new.
+            </p>
+
+            <div class="field-label">Period end</div>
+            <input type="date" class="date-input" @bind="_periodEnd" min="@loan.DisbursedOn.ToString("yyyy-MM-dd")" />
+
+            <ErrorBanner @bind-Message="_accrueError" />
+
+            <div class="form-actions">
+                <BitButton Color="BitColor.Primary" Variant="BitVariant.Outline" IsLoading="_accruing"
+                           IsEnabled="@(!_s.IsSettled)" OnClick="Accrue">Accrue interest</BitButton>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <h2>Record a repayment</h2>
+            <p class="muted">Interest is paid first, then principal.</p>
+
+            <BitTextField @bind-Value="Amount" Label="Amount" Placeholder="0.00" MaxLength="15"
+                          Immediate ErrorMessage="@AmountError" IsEnabled="!_s.IsSettled" />
+
+            <div class="field-label">Payment date</div>
+            <input type="date" class="date-input" @bind="_repayDate" min="@loan.DisbursedOn.ToString("yyyy-MM-dd")" />
+
+            <BitTextField @bind-Value="_narration" Label="Narration (optional)"
+                          Placeholder="@($"Loan repayment · {loan.CustomerName}")" MaxLength="500" Immediate />
+
+            @if (_parsed is > 0 && AmountError is null)
+            {
+                <div class="split-preview">
+                    <div><span>To interest</span><strong>@Fmt.Money(InterestPart)</strong></div>
+                    <div><span>To principal</span><strong>@Fmt.Money(PrincipalPart)</strong></div>
+                    <div><span>Still owed after</span><strong>@Fmt.Money(_s.TotalOutstanding - _parsed.Value)</strong></div>
+                </div>
+            }
+
+            <ErrorBanner @bind-Message="_repayError" />
+
+            <div class="form-actions">
+                <BitButton Color="BitColor.Primary" IsLoading="_repaying"
+                           IsEnabled="@(_parsed is > 0 && AmountError is null && !_s.IsSettled)"
+                           OnClick="Repay">Record repayment</BitButton>
+            </div>
+        </div>
+    </AuthorizeView>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private LoanSummaryDto? _s;
+    private int _loadedId;
+    private bool _loading = true;
+    private string? _error, _success, _repayError, _accrueError;
+    private bool _repaying, _accruing;
+
+    private string? _amount, _narration;
+    private decimal? _parsed;
+    private string _key = NewKey();
+    private DateOnly _repayDate = Today();
+    private DateOnly _periodEnd = EndOfThisMonth();
+
+    private static DateOnly Today() => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    private static DateOnly EndOfThisMonth()
+    {
+        var t = Today();
+        return new DateOnly(t.Year, t.Month, DateTime.DaysInMonth(t.Year, t.Month));
+    }
+
+    private static string NewKey() => $"rpy-{Guid.NewGuid():N}";
+
+    // A new amount is a new attempt, so it gets a new idempotency key
+    private string? Amount
+    {
+        get => _amount;
+        set
+        {
+            _amount = value;
+            _key = NewKey();
+            _parsed = decimal.TryParse(value?.Replace(",", ""), NumberStyles.Number,
+                CultureInfo.InvariantCulture, out var d) ? d : null;
+        }
+    }
+
+    private string? AmountError
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_amount) || _s is null) return null;
+            if (_parsed is null) return "Enter a number, e.g. 1500.00";
+            if (_parsed <= 0) return "Must be greater than zero";
+            if (decimal.Round(_parsed.Value, 2) != _parsed) return "At most 2 decimal places";
+            if (_parsed > _s.TotalOutstanding) return $"More than the {Fmt.Money(_s.TotalOutstanding)} owed";
+            return null;
+        }
+    }
+
+    // Display only. The server applies the same rule and is the one that decides.
+    private decimal InterestPart =>
+        _parsed is > 0 && _s is not null ? Math.Min(_parsed.Value, Math.Max(_s.InterestOutstanding, 0m)) : 0m;
+
+    private decimal PrincipalPart => (_parsed ?? 0m) - InterestPart;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedId == Id) return;
+
+        _loadedId = Id;
+        _loading = true;
+        _s = null;
+        _error = _success = _repayError = _accrueError = null;
+        ClearRepayForm();
+
+        try
+        {
+            _s = await Api.GetLoanAsync(Id);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;   // e.g. "Loan 99 was not found."
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ClearRepayForm()
+    {
+        _amount = null; _parsed = null; _narration = null;
+        _key = NewKey();
+    }
+
+    private async Task Repay()
+    {
+        if (_repaying || _parsed is not { } amount || AmountError is not null) return;
+
+        _repaying = true;
+        _repayError = null;
+        try
+        {
+            var result = await Api.RepayLoanAsync(Id, new RepayLoanRequest(
+                amount, _repayDate, string.IsNullOrWhiteSpace(_narration) ? null : _narration.Trim(), _key));
+
+            _s = result.Loan;
+            _success = $"Recorded {Fmt.Money(amount)}: {Fmt.Money(result.InterestPaid)} to interest, " +
+                       $"{Fmt.Money(result.PrincipalPaid)} to principal." +
+                       (result.Loan.IsSettled ? " The loan is now settled." : "");
+            ClearRepayForm();
+        }
+        catch (ApiException ex)
+        {
+            _repayError = ex.Message;
+        }
+        finally
+        {
+            _repaying = false;
+        }
+    }
+
+    private async Task Accrue()
+    {
+        if (_accruing) return;
+
+        _accruing = true;
+        _accrueError = null;
+        try
+        {
+            var result = await Api.AccrueInterestAsync(Id, _periodEnd);
+
+            _s = result.Loan;
+            _success = result.Entry is null
+                ? "Nothing to accrue for that period."
+                : $"Interest for {_periodEnd:MMMM yyyy}: {Fmt.Money(result.Amount)}. " +
+                  "Accruing the same month again posts nothing new.";
+        }
+        catch (ApiException ex)
+        {
+            _accrueError = ex.Message;
+        }
+        finally
+        {
+            _accruing = false;
+        }
+    }
+}

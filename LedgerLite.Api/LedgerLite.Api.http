@@ -637,3 +637,45 @@ GET {{host}}/api/accounts/1/ledger?page=999
 
 ### Out-of-range paging is clamped (expect page 1, pageSize 200)
 GET {{host}}/api/accounts/1/ledger?page=0&pageSize=100000
+
+### ---------------- Savings (Owner only) ----------------
+
+### Open a savings account for a customer (expect 201)
+# @name openSavings
+POST {{host}}/api/savings/accounts
+Content-Type: application/json
+
+{ "customerName": "Jane Wanjiru" }
+
+### Deposit cash (expect 201; repeat the same Idempotency-Key and you get 200 with the same entry)
+POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/deposit
+Content-Type: application/json
+
+{ "amount": 5000.00, "narration": "Opening deposit", Idempotency-Key: dep-jane-0001 }
+
+### Withdraw cash (expect 201)
+POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw
+Content-Type: application/json
+
+{ "amount": 1200.00, Idempotency-Key: wdr-jane-0001 }
+
+### Withdraw more than the balance (expect 422 InsufficientFunds)
+POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw
+Content-Type: application/json
+
+{ "amount": 999999.00 }
+
+### Deposit into a normal account, e.g. Cash (expect 422 NotASavingsAccount)
+POST {{host}}/api/savings/accounts/1/deposit
+Content-Type: application/json
+
+{ "amount": 100.00 }
+
+### Bad amount (expect 422 InvalidCashAmount)
+POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/deposit
+Content-Type: application/json
+
+{ "amount": -5 }
+
+### The customer's statement (running balance)
+GET {{host}}/api/accounts/{{openSavings.response.body.$.id}}/ledger

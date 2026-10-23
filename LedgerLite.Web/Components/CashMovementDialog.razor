@@ -1,0 +1,143 @@
+﻿@using System.Globalization
+@inject LedgerApiClient Api
+
+<BitModal IsOpen="IsOpen" Blocking="true">
+    <div class="dialog">
+        @if (Account is not null)
+        {
+            <h2 class="dialog-title">@(IsDeposit ? "Deposit cash" : "Withdraw cash")</h2>
+            <p><strong>@Account.Code · @Account.Name</strong></p>
+            <p class="muted">
+                Current balance:
+                @if (_balance is null) { <text>…</text> } else { <strong>@Fmt.Money(_balance.Value)</strong> }
+            </p>
+
+            <BitTextField @bind-Value="Amount"
+                          Label="Amount"
+                          Placeholder="0.00"
+                          Required
+                          MaxLength="15"
+                          Immediate
+                          ErrorMessage="@AmountError" />
+
+            <BitTextField @bind-Value="_narration"
+                          Label="Narration (optional)"
+                          Placeholder="@DefaultNarration"
+                          MaxLength="500"
+                          Immediate />
+
+            <ErrorBanner @bind-Message="_error" />
+
+            <div class="dialog-actions">
+                <BitButton Variant="BitVariant.Outline" IsEnabled="!_busy" OnClick="Cancel">Cancel</BitButton>
+                <BitButton Color="BitColor.Primary" IsLoading="_busy"
+                           IsEnabled="@(_parsed is not null && AmountError is null)"
+                           OnClick="Submit">
+                    @(IsDeposit ? "Deposit" : "Withdraw")
+                </BitButton>
+            </div>
+        }
+    </div>
+</BitModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public AccountDto? Account { get; set; }
+    [Parameter] public bool IsDeposit { get; set; }
+    [Parameter] public EventCallback<string> OnPosted { get; set; }
+
+    private string? _amount;
+    private string? _narration;
+    private string? _error;
+    private decimal? _balance;
+    private decimal? _parsed;
+    private bool _busy;
+    private bool _wasOpen;
+    private string _key = "";
+
+    private string DefaultNarration =>
+        IsDeposit ? $"Cash deposit · {Account?.Name}" : $"Cash withdrawal · {Account?.Name}";
+
+    // A new amount is a new attempt, so it gets a new idempotency key
+    private string? Amount
+    {
+        get => _amount;
+        set
+        {
+            _amount = value;
+            _key = NewKey();
+            _parsed = decimal.TryParse(value?.Replace(",", ""), NumberStyles.Number,
+                CultureInfo.InvariantCulture, out var d) ? d : null;
+        }
+    }
+
+    private string? AmountError
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_amount)) return null;
+            if (_parsed is null) return "Enter a number, e.g. 1500.00";
+            if (_parsed <= 0) return "Must be greater than zero";
+            if (decimal.Round(_parsed.Value, 2) != _parsed) return "At most 2 decimal places";
+            if (!IsDeposit && _balance is not null && _parsed > _balance) return "More than the available balance";
+            return null;
+        }
+    }
+
+    private string NewKey() => $"{(IsDeposit ? "dep" : "wdr")}-{Guid.NewGuid():N}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !_wasOpen && Account is not null)
+        {
+            _wasOpen = true;
+            _amount = null; _parsed = null; _narration = null; _error = null; _balance = null;
+            _key = NewKey();
+
+            try
+            {
+                // pageSize 1: we only want the whole-range closing balance
+                _balance = (await Api.GetLedgerAsync(Account.Id, pageSize: 1)).ClosingBalance;
+            }
+            catch (ApiException) { /* balance is a convenience; the server enforces the rule */ }
+        }
+        else if (!IsOpen)
+        {
+            _wasOpen = false;
+        }
+    }
+
+    private Task Cancel() => _busy ? Task.CompletedTask : IsOpenChanged.InvokeAsync(false);
+
+    private async Task Submit()
+    {
+        if (_busy || Account is null || _parsed is null || AmountError is not null) return;
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var request = new CashMovementRequest(
+                _parsed.Value, null,
+                string.IsNullOrWhiteSpace(_narration) ? null : _narration.Trim(),
+                _key);
+
+            if (IsDeposit) await Api.DepositAsync(Account.Id, request);
+            else await Api.WithdrawAsync(Account.Id, request);
+
+            await IsOpenChanged.InvokeAsync(false);
+            await OnPosted.InvokeAsync(
+                $"{(IsDeposit ? "Deposited" : "Withdrew")} {Fmt.Money(_parsed.Value)} " +
+                $"{(IsDeposit ? "into" : "from")} {Account.Name}.");
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;   // e.g. "Account SAV-000001 has 500.00 available; cannot withdraw 900.00."
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,5 +1,6 @@
 ﻿using LedgerLite.Application.Accounts;
 using LedgerLite.Application.Journal;
+using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
 using LedgerLite.Application.Savings;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,13 @@ public static class DependencyInjection
         services.AddScoped<OpenSavingsAccount>();
         services.AddScoped<DepositCash>();
         services.AddScoped<WithdrawCash>();
+
+        services.AddScoped<DisburseLoan>();
+        services.AddScoped<AccrueInterest>();
+        services.AddScoped<RepayLoan>();
+        services.AddScoped<GetLoanSummary>();
+        services.AddScoped<ListLoans>();
+
         return services;
     }
 }

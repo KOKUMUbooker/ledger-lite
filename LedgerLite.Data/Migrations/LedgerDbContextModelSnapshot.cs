@@ -17,7 +17,7 @@ namespace LedgerLite.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -108,6 +108,14 @@ namespace LedgerLite.Data.Migrations
                             IsActive = true,
                             Name = "Interest Expense",
                             Type = "Expense"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "1210",
+                            IsActive = true,
+                            Name = "Interest Receivable",
+                            Type = "Asset"
                         });
                 });
 

@@ -83,6 +83,24 @@ public class LedgerApiClient
         (await SendAsync<TrialBalanceDto>(HttpMethod.Get, Url("api/reports/trial-balance", ("asOf", D(asOf))), null, ct))
         .Value;
 
+    // ---- Loans ----
+
+    public async Task<List<LoanSummaryDto>> ListLoansAsync(CancellationToken ct = default) =>
+    (await SendAsync<List<LoanSummaryDto>>(HttpMethod.Get, "api/loans", null, ct)).Value;
+
+    public async Task<LoanSummaryDto> GetLoanAsync(int loanId, CancellationToken ct = default) =>
+        (await SendAsync<LoanSummaryDto>(HttpMethod.Get, $"api/loans/{loanId}", null, ct)).Value;
+
+    public async Task<LoanSummaryDto> DisburseLoanAsync(DisburseLoanRequest request, CancellationToken ct = default) =>
+        (await SendAsync<LoanSummaryDto>(HttpMethod.Post, "api/loans", request, ct)).Value;
+
+    public async Task<RepaymentDto> RepayLoanAsync(int loanId, RepayLoanRequest request, CancellationToken ct = default) =>
+        (await SendAsync<RepaymentDto>(HttpMethod.Post, $"api/loans/{loanId}/repayments", request, ct)).Value;
+
+    public async Task<AccrualDto> AccrueInterestAsync(int loanId, DateOnly periodEnd, CancellationToken ct = default) =>
+        (await SendAsync<AccrualDto>(
+            HttpMethod.Post, $"api/loans/{loanId}/accruals", new AccrueInterestRequest(periodEnd), ct)).Value;
+
     // ---- Plumbing ----
 
     private record ApiResponse<T>(T Value, HttpStatusCode Status);

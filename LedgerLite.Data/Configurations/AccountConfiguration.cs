@@ -30,7 +30,8 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             new { Id = 3, Code = "2000", Name = "Customer Deposits", Type = AccountType.Liability, ParentAccountId = (int?)null, IsActive = true },
             new { Id = 4, Code = "3000", Name = "Share Capital", Type = AccountType.Equity, ParentAccountId = (int?)null, IsActive = true },
             new { Id = 5, Code = "4000", Name = "Interest Income", Type = AccountType.Income, ParentAccountId = (int?)null, IsActive = true },
-            new { Id = 6, Code = "5000", Name = "Interest Expense", Type = AccountType.Expense, ParentAccountId = (int?)null, IsActive = true }
+            new { Id = 6, Code = "5000", Name = "Interest Expense", Type = AccountType.Expense, ParentAccountId = (int?)null, IsActive = true },
+            new { Id = 7, Code = "1210", Name = "Interest Receivable", Type = AccountType.Asset, ParentAccountId = (int?)null, IsActive = true }
         );
     }
 }

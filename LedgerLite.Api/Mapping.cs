@@ -1,4 +1,5 @@
 ﻿using LedgerLite.Application.Journal;
+using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
 using LedgerLite.Contracts;
 using LedgerLite.Domain.Entities;
@@ -54,4 +55,11 @@ internal static class Mapping
         t.GrandTotalDebits,
         t.GrandTotalCredits,
         t.IsBalanced);
+
+    public static LoanDto ToDto(this Loan l) => new(
+        l.Id, l.CustomerName, l.PrincipalAmount, l.AnnualRatePercent, l.TermMonths,
+        l.DisbursedOn, l.PrincipalAccountId, l.InterestAccountId);
+
+    public static LoanSummaryDto ToDto(this LoanSummary s) => new(
+        s.Loan.ToDto(), s.PrincipalOutstanding, s.InterestOutstanding, s.TotalOutstanding, s.IsSettled);
 }

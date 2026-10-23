@@ -17,7 +17,7 @@ namespace LedgerLite.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -108,6 +108,14 @@ namespace LedgerLite.Data.Migrations
                             IsActive = true,
                             Name = "Interest Expense",
                             Type = "Expense"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Code = "1210",
+                            IsActive = true,
+                            Name = "Interest Receivable",
+                            Type = "Asset"
                         });
                 });
 
@@ -196,6 +204,56 @@ namespace LedgerLite.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LedgerLite.Domain.Entities.Loan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AnnualRatePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateOnly>("DisbursedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DisbursementKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("InterestAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrincipalAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrincipalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TermMonths")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DisbursementKey")
+                        .IsUnique()
+                        .HasFilter("[DisbursementKey] IS NOT NULL");
+
+                    b.HasIndex("InterestAccountId");
+
+                    b.HasIndex("PrincipalAccountId");
+
+                    b.ToTable("Loans", (string)null);
+                });
+
             modelBuilder.Entity("LedgerLite.Domain.Entities.Account", b =>
                 {
                     b.HasOne("LedgerLite.Domain.Entities.Account", null)
@@ -223,6 +281,21 @@ namespace LedgerLite.Data.Migrations
                     b.HasOne("LedgerLite.Domain.Entities.JournalEntry", null)
                         .WithMany("Lines")
                         .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LedgerLite.Domain.Entities.Loan", b =>
+                {
+                    b.HasOne("LedgerLite.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("InterestAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LedgerLite.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("PrincipalAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

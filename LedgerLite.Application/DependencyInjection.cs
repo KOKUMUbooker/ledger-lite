@@ -1,6 +1,8 @@
 ﻿using LedgerLite.Application.Accounts;
 using LedgerLite.Application.Journal;
+using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
+using LedgerLite.Application.Savings;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LedgerLite.Application;
@@ -18,6 +20,18 @@ public static class DependencyInjection
         services.AddScoped<GetJournalEntry>();
         services.AddScoped<ListJournalEntries>();
         services.AddScoped<SetAccountActive>();
+
+        services.AddSingleton(new SystemAccountCodes());   // defaults: Cash 1000, Customer Deposits 2000
+        services.AddScoped<OpenSavingsAccount>();
+        services.AddScoped<DepositCash>();
+        services.AddScoped<WithdrawCash>();
+
+        services.AddScoped<DisburseLoan>();
+        services.AddScoped<AccrueInterest>();
+        services.AddScoped<RepayLoan>();
+        services.AddScoped<GetLoanSummary>();
+        services.AddScoped<ListLoans>();
+
         return services;
     }
 }

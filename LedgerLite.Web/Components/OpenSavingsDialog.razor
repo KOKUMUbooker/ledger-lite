@@ -1,0 +1,66 @@
+﻿@inject LedgerApiClient Api
+
+<BitModal IsOpen="IsOpen" Blocking="true">
+    <div class="dialog">
+        <h2 class="dialog-title">Open savings account</h2>
+        <p class="muted">
+            Creates a sub-account under Customer Deposits for this customer, so what you owe them is tracked separately.
+        </p>
+
+        <BitTextField @bind-Value="_name"
+                      Label="Customer name"
+                      Placeholder="e.g. Jane Wanjiru"
+                      Required
+                      MaxLength="80"
+                      Immediate />
+
+        <ErrorBanner @bind-Message="_error" />
+
+        <div class="dialog-actions">
+            <BitButton Variant="BitVariant.Outline" IsEnabled="!_busy" OnClick="Cancel">Cancel</BitButton>
+            <BitButton Color="BitColor.Primary" IsLoading="_busy" IsEnabled="@(!string.IsNullOrWhiteSpace(_name))"
+                       OnClick="Submit">Open account</BitButton>
+        </div>
+    </div>
+</BitModal>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public EventCallback<AccountDto> OnOpened { get; set; }
+
+    private string? _name;
+    private string? _error;
+    private bool _busy;
+    private bool _wasOpen;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen) { _name = null; _error = null; }
+        _wasOpen = IsOpen;
+    }
+
+    private Task Cancel() => _busy ? Task.CompletedTask : IsOpenChanged.InvokeAsync(false);
+
+    private async Task Submit()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_name)) return;
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var account = await Api.OpenSavingsAccountAsync(_name.Trim());
+            await IsOpenChanged.InvokeAsync(false);
+            await OnOpened.InvokeAsync(account);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

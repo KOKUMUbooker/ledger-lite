@@ -12,12 +12,14 @@ public class LedgerExceptionHandler : IExceptionHandler
     {
         var (status, title) = exception switch
         {
-            AccountNotFoundException or EntryNotFoundException
+            AccountNotFoundException or EntryNotFoundException or LoanNotFoundException
                 => (StatusCodes.Status404NotFound, "Not found"),
             DuplicateAccountCodeException or EntryAlreadyReversedException
                 => (StatusCodes.Status409Conflict, "Conflict"),
             AccountInactiveException or InvalidParentAccountException
                 or AccountHasBalanceException or AccountHasActiveChildrenException
+                or NotASavingsAccountException or InsufficientFundsException or InvalidCashAmountException
+                or OverpaymentException or InvalidLoanOperationException
                 => (StatusCodes.Status422UnprocessableEntity, "Business rule violated"),
             DomainException
                 => (StatusCodes.Status400BadRequest, "Invalid request"),

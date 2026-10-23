@@ -56,3 +56,41 @@ public class EntryAlreadyReversedException : LedgerApplicationException
     public EntryAlreadyReversedException(int entryId)
         : base($"Journal entry {entryId} has already been reversed.") { }
 }
+
+public class NotASavingsAccountException : LedgerApplicationException
+{
+    public NotASavingsAccountException(string code)
+        : base($"Account {code} is not a customer savings account.") { }
+}
+
+public class InsufficientFundsException : LedgerApplicationException
+{
+    public InsufficientFundsException(string code, decimal balance, decimal amount)
+        : base($"Account {code} has {balance.ToString("N2", CultureInfo.InvariantCulture)} available; " +
+               $"cannot withdraw {amount.ToString("N2", CultureInfo.InvariantCulture)}.")
+    { }
+}
+
+public class InvalidCashAmountException : LedgerApplicationException
+{
+    public InvalidCashAmountException()
+        : base("Amount must be greater than zero and have at most 2 decimal places.") { }
+}
+
+public class LoanNotFoundException : LedgerApplicationException
+{
+    public LoanNotFoundException(int id) : base($"Loan {id} was not found.") { }
+}
+
+public class OverpaymentException : LedgerApplicationException
+{
+    public OverpaymentException(decimal outstanding, decimal amount)
+        : base($"The loan has {outstanding.ToString("N2", CultureInfo.InvariantCulture)} outstanding; " +
+               $"cannot repay {amount.ToString("N2", CultureInfo.InvariantCulture)}.")
+    { }
+}
+
+public class InvalidLoanOperationException : LedgerApplicationException
+{
+    public InvalidLoanOperationException(string message) : base(message) { }
+}

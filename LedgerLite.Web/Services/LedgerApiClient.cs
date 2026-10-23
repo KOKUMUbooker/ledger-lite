@@ -65,11 +65,41 @@ public class LedgerApiClient
         int id, ReverseEntryRequest request, CancellationToken ct = default) =>
         (await SendAsync<JournalEntryDto>(HttpMethod.Post, $"api/journal-entries/{id}/reverse", request, ct)).Value;
 
+    public async Task<AccountDto> OpenSavingsAccountAsync(string customerName, CancellationToken ct = default) =>
+    (await SendAsync<AccountDto>(
+        HttpMethod.Post, "api/savings/accounts", new OpenSavingsAccountRequest(customerName), ct)).Value;
+
+    public async Task<JournalEntryDto> DepositAsync(int accountId, CashMovementRequest request, CancellationToken ct = default) =>
+        (await SendAsync<JournalEntryDto>(
+            HttpMethod.Post, $"api/savings/accounts/{accountId}/deposit", request, ct)).Value;
+
+    public async Task<JournalEntryDto> WithdrawAsync(int accountId, CashMovementRequest request, CancellationToken ct = default) =>
+        (await SendAsync<JournalEntryDto>(
+            HttpMethod.Post, $"api/savings/accounts/{accountId}/withdraw", request, ct)).Value;
+
     // ---- Reports ----
 
     public async Task<TrialBalanceDto> GetTrialBalanceAsync(DateOnly? asOf = null, CancellationToken ct = default) =>
         (await SendAsync<TrialBalanceDto>(HttpMethod.Get, Url("api/reports/trial-balance", ("asOf", D(asOf))), null, ct))
         .Value;
+
+    // ---- Loans ----
+
+    public async Task<List<LoanSummaryDto>> ListLoansAsync(CancellationToken ct = default) =>
+    (await SendAsync<List<LoanSummaryDto>>(HttpMethod.Get, "api/loans", null, ct)).Value;
+
+    public async Task<LoanSummaryDto> GetLoanAsync(int loanId, CancellationToken ct = default) =>
+        (await SendAsync<LoanSummaryDto>(HttpMethod.Get, $"api/loans/{loanId}", null, ct)).Value;
+
+    public async Task<LoanSummaryDto> DisburseLoanAsync(DisburseLoanRequest request, CancellationToken ct = default) =>
+        (await SendAsync<LoanSummaryDto>(HttpMethod.Post, "api/loans", request, ct)).Value;
+
+    public async Task<RepaymentDto> RepayLoanAsync(int loanId, RepayLoanRequest request, CancellationToken ct = default) =>
+        (await SendAsync<RepaymentDto>(HttpMethod.Post, $"api/loans/{loanId}/repayments", request, ct)).Value;
+
+    public async Task<AccrualDto> AccrueInterestAsync(int loanId, DateOnly periodEnd, CancellationToken ct = default) =>
+        (await SendAsync<AccrualDto>(
+            HttpMethod.Post, $"api/loans/{loanId}/accruals", new AccrueInterestRequest(periodEnd), ct)).Value;
 
     // ---- Plumbing ----
 

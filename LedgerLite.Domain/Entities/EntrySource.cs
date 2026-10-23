@@ -3,6 +3,10 @@
 public enum EntrySource
 {
     Manual,
-    Reversal
-    // Stage 2 adds: InterestAccrual, LoanDisbursement, LoanRepayment
+    Reversal,
+    DepositCash,
+    WithdrawCash,
+    InterestAccrual, 
+    LoanDisbursement, 
+    LoanRepayment
 }

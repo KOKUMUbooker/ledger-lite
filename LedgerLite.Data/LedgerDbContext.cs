@@ -10,6 +10,7 @@ public class LedgerDbContext : DbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
+    public DbSet<Loan> Loans => Set<Loan>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -236,3 +236,28 @@ Why keep them separate:
 - Stage 1 exposes the raw "post these lines" operation on purpose, so you can type debits and credits yourself and see why they must balance.
 
 Loan repayment (7.4) is not a plain if-condition. Its posting rule also needs the principal and interest split from the loan schedule, which is the interesting part of Stage 2.
+
+## Posting rules: savings and loans
+
+Every product operation is a balanced journal entry built by a posting rule. The rules never touch balances
+directly; balances are derived from the lines.
+
+| Operation                               | Debit                            | Credit                                     | Guard                                |
+| --------------------------------------- | -------------------------------- | ------------------------------------------ | ------------------------------------ |
+| Customer deposits cash                  | Cash                             | Customer savings (liability)               | Target must be a savings sub-account |
+| Customer withdraws cash                 | Customer savings                 | Cash                                       | Balance must cover the amount        |
+| Loan disbursed                          | Loan principal (asset)           | Cash                                       | Valid amount, rate and term          |
+| Month's interest accrues                | Loan interest receivable (asset) | Interest income                            | One per loan per month               |
+| Customer repays 150 (100 interest owed) | Cash 150                         | Interest receivable 100, Loan principal 50 | Cannot exceed what is owed           |
+
+**Why savings is a liability.** The cash in the till is the bank's asset, but the customer can claim it back.
+A deposit raises both Cash (asset) and what we owe the customer (liability), so the equation stays balanced.
+
+**Why interest is accrued.** Interest is _earned_ as time passes, not when it is paid. Accrual debits an
+interest receivable (what the customer owes us) and credits income straight away; the repayment later moves
+money from receivable to cash. Income is therefore recognised in the right month.
+
+**Repayment order.** Interest is paid before principal. Changing that policy is one line in `RepayLoan`.
+
+**Rounding.** Monthly interest is `principal x annual rate / 1200`, rounded once to cents with half-away-from-zero
+(0.005 becomes 0.01). The rounded figure is what is posted, so the books always hold exact cents.

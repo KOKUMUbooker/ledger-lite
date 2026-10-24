@@ -24,7 +24,10 @@ involved.
 - **Trial balance** as of any date, which proves the books balance
 - **Dashboard** showing the accounting equation (`Assets = Liabilities + Equity + Net income`) and flagging accounts with an unusual balance
 - **Google and GitHub sign-in** with an Owner role (can post and reverse) and a read-only Visitor role
-- **Rate limiting** and a documented path to a hardened VPS deployment
+- **Account lifecycle**: deactivate and reactivate accounts (only with a zero balance and no active sub-accounts), and paged ledgers whose running balance carries across pages
+- **Savings**: one sub-account per customer, cash deposits and withdrawals that can never overdraw, even under concurrent requests
+- **Loans**: disbursement, monthly interest accrual, and repayments applied interest-first. Balances and "settled" status come from the ledger, so reversing a repayment reopens the loan
+- **Month-end batch**: accrues interest for every loan, safe to re-run, and one failing loan never stops the rest. Results are shown per loan, with a retry for the failures
 
 <!-- Add screenshots to docs/images and uncomment:
 ![Dashboard](docs/images/dashboard.png)
@@ -61,9 +64,9 @@ in `.env.example`):
 - Owner: <http://localhost:5059/api/auth/dev-login?returnUrl=/>
 - Read-only visitor: <http://localhost:5059/api/auth/dev-login?role=visitor&returnUrl=/>
 
-Starter accounts: `1000 Cash`, `1200 Loan Receivable`, `2000 Customer Deposits`, `3000 Share Capital`,
-`4000 Interest Income`, `5000 Interest Expense`. To see how entries work, open **How it works** in the app and
-try one of the worked examples.
+Starter accounts: `1000 Cash`, `1200 Loan Receivable`, `1210 Interest Receivable`, `2000 Customer Deposits`,
+`3000 Share Capital`, `4000 Interest Income`, `5000 Interest Expense`. Savings and loan sub-accounts
+(`SAV-…`, `LN-…`, `LI-…`) are created as customers and loans are added.
 
 ## Configuration
 
@@ -134,22 +137,34 @@ flowchart LR
 - **Money is `decimal(18,2)`**, and the accounting date (`DateOnly`) is kept separate from the moment of posting (`PostedAt`, UTC), so backdating is explicit.
 - **Errors are ProblemDetails** with a stable `code`: `404` not found, `409` conflict (duplicate code, already reversed), `422` business rule, `400` invalid input or domain rule broken, `429` rate limited.
 - **The Api hosts the web app,** so the sign-in cookie is a plain same-origin HttpOnly cookie, with no tokens in the browser.
+- **Rounding happens once, in one place:** monthly interest is rounded to cents (half away from zero) before it is posted, so every entry is exact and the ledger and the loan receivable cannot drift apart.
+- **Check-then-post is serialised.** Withdrawals and repayments hold a row lock on the account they depend on, so two simultaneous requests can't both pass the same balance check. Covered by concurrency tests.
+- **Batches are idempotent and isolated.** Month-end accrual keys each loan-month, runs each loan in its own scope, and reports failures per loan instead of aborting.
+- **Time is injected** (`TimeProvider`) wherever a rule depends on "today", so tests don't depend on the day they run.
 
 ## API overview
 
-| Method | Route                                            | Notes                                                     |
-| ------ | ------------------------------------------------ | --------------------------------------------------------- |
-| GET    | `/api/accounts?type=`                            | List accounts                                             |
-| POST   | `/api/accounts`                                  | Create an account (Owner)                                 |
-| GET    | `/api/accounts/{id}/ledger?from=&to=`            | Ledger with running balance                               |
-| GET    | `/api/journal-entries?from=&to=&page=&pageSize=` | Paged, newest first                                       |
-| POST   | `/api/journal-entries`                           | Post an entry (Owner). `201` new, `200` idempotent replay |
-| GET    | `/api/journal-entries/{id}`                      | One entry, with `reversalOfEntryId` / `reversedByEntryId` |
-| POST   | `/api/journal-entries/{id}/reverse`              | Reverse an entry (Owner)                                  |
-| GET    | `/api/reports/trial-balance?asOf=`               | Trial balance                                             |
-| GET    | `/api/auth/login/{provider}`                     | Start Google or GitHub sign-in                            |
-| GET    | `/api/auth/me`                                   | Current user and role                                     |
-| POST   | `/api/auth/logout`                               | Sign out                                                  |
+| Method | Route                                                 | Notes                                                              |
+| ------ | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| GET    | `/api/accounts?type=`                                 | List accounts                                                      |
+| POST   | `/api/accounts`                                       | Create an account (Owner)                                          |
+| GET    | `/api/accounts/{id}/ledger?from=&to=&page=&pageSize=` | Ledger with running balance                                        |
+| GET    | `/api/journal-entries?from=&to=&page=&pageSize=`      | Paged, newest first                                                |
+| POST   | `/api/journal-entries`                                | Post an entry (Owner). `201` new, `200` idempotent replay          |
+| GET    | `/api/journal-entries/{id}`                           | One entry, with `reversalOfEntryId` / `reversedByEntryId`          |
+| POST   | `/api/journal-entries/{id}/reverse`                   | Reverse an entry (Owner)                                           |
+| GET    | `/api/reports/trial-balance?asOf=`                    | Trial balance                                                      |
+| GET    | `/api/auth/login/{provider}`                          | Start Google or GitHub sign-in                                     |
+| GET    | `/api/auth/me`                                        | Current user and role                                              |
+| POST   | `/api/auth/logout`                                    | Sign out                                                           |
+| POST   | `/api/accounts/{id}/deactivate` and `/activate`       | Owner. Deactivate needs a zero balance and no active sub-accounts  |
+| POST   | `/api/savings/accounts`                               | Open a customer savings account (Owner)                            |
+| POST   | `/api/savings/accounts/{id}/deposit` and `/withdraw`  | Owner. Withdrawals can't overdraw. Idempotent via `idempotencyKey` |
+| GET    | `/api/loans`, `/api/loans/{id}`                       | Loans with principal and interest outstanding                      |
+| POST   | `/api/loans`                                          | Disburse a loan (Owner). Idempotent                                |
+| POST   | `/api/loans/{id}/repayments`                          | Repay, interest first (Owner). Returns the split                   |
+| POST   | `/api/loans/{id}/accruals`                            | Accrue one month's interest (Owner)                                |
+| POST   | `/api/batch/month-end-accrual`                        | Accrue every loan; optional `loanIds` to retry some (Owner)        |
 
 A ready-made request collection covering every endpoint, including the failure cases, is in
 [`LedgerLite.Api/requests.http`](LedgerLite.Api/requests.http).

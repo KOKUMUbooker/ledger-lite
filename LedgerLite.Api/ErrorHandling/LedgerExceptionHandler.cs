@@ -14,7 +14,7 @@ public class LedgerExceptionHandler : IExceptionHandler
         {
             AccountNotFoundException or EntryNotFoundException or LoanNotFoundException
                 => (StatusCodes.Status404NotFound, "Not found"),
-            DuplicateAccountCodeException or EntryAlreadyReversedException
+            DuplicateAccountCodeException or EntryAlreadyReversedException or BatchAlreadyRunningException
                 => (StatusCodes.Status409Conflict, "Conflict"),
             AccountInactiveException or InvalidParentAccountException
                 or AccountHasBalanceException or AccountHasActiveChildrenException

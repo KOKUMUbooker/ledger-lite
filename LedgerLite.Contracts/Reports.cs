@@ -16,7 +16,8 @@ public record AccountLedgerDto(
 
 public record TrialBalanceRowDto(
     int AccountId, string Code, string Name, string Type,
-    decimal TotalDebits, decimal TotalCredits, decimal Balance);
+    decimal TotalDebits, decimal TotalCredits, decimal Balance,
+    bool HasChildren, decimal RolledUpBalance);
 
 public record TrialBalanceDto(
     DateOnly? AsOf,

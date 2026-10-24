@@ -1,0 +1,192 @@
+﻿@page "/month-end"
+@attribute [Authorize(Roles = "Owner")]
+@inject LedgerApiClient Api
+
+<PageTitle>Month-end · LedgerLite</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Month-end</h1>
+        <p class="muted">
+            Accrues one month of interest on every loan, based on the principal outstanding at the period end.
+            It's safe to run twice: a month that has already been accrued is reported, never posted again.
+        </p>
+    </div>
+</div>
+
+<div class="form-card">
+    <div class="field-label">Period end</div>
+    <input type="date" class="date-input" @bind="PeriodEnd" max="@MaxDate.ToString("yyyy-MM-dd")" />
+
+    <div class="form-actions">
+        <BitButton Color="BitColor.Primary" IsLoading="_running" IsEnabled="@(PeriodEnd <= MaxDate)"
+                   OnClick="() => Run(null)">Run month-end</BitButton>
+    </div>
+</div>
+
+<ErrorBanner @bind-Message="_error" />
+
+@if (_rows is not null)
+{
+    <h2>Results for @_ranFor.ToString("MMMM yyyy")</h2>
+
+    @if (_rows.Count == 0)
+    {
+        <p class="muted">No loans were disbursed on or before that date.</p>
+    }
+    else
+    {
+        <div class="loan-stats">
+            <div class="stat">
+                <div class="stat-label">Accrued</div>
+                <div class="stat-value">@Count("Accrued")</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Already accrued</div>
+                <div class="stat-value">@Count("AlreadyAccrued")</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Nothing to accrue</div>
+                <div class="stat-value">@Count("NothingToAccrue")</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Failed</div>
+                <div class="stat-value">@Count("Failed")</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Interest posted by these runs</div>
+                <div class="stat-value">@Fmt.Money(TotalPosted)</div>
+            </div>
+        </div>
+
+        @if (FailedIds.Count > 0)
+        {
+            <BitMessage Color="BitColor.Warning">
+                @FailedIds.Count loan(s) failed and were skipped. Everything else was posted.
+                Fix the cause shown below, then retry only the failed ones.
+            </BitMessage>
+            <div class="form-actions">
+                <BitButton Color="BitColor.Primary" IsLoading="_running" OnClick="() => Run(FailedIds)">
+                    Retry @FailedIds.Count failed
+                </BitButton>
+            </div>
+        }
+
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Loan</th>
+                        <th>Customer</th>
+                        <th>Outcome</th>
+                        <th class="num">Interest</th>
+                        <th>Detail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _rows)
+                    {
+                        <tr>
+                            <td><a href="/loans/@row.LoanId">#@row.LoanId</a></td>
+                            <td>@row.CustomerName</td>
+                            <td><span class="badge @BadgeClass(row.Outcome)">@Label(row.Outcome)</span></td>
+                            <td class="num">@(row.Outcome == "Accrued" ? Fmt.Money(row.Amount) : "-")</td>
+                            <td class="muted">@row.Error</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private List<LoanAccrualResultDto>? _rows;
+    private DateOnly _periodEnd = DefaultPeriodEnd();
+    private DateOnly _ranFor;
+    private bool _running;
+    private string? _error;
+
+    // The server refuses dates more than a day ahead, so the picker is capped there too
+    private static DateOnly MaxDate => DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+    // A different period makes the old results misleading, so clear them
+    private DateOnly PeriodEnd
+    {
+        get => _periodEnd;
+        set
+        {
+            if (_periodEnd == value) return;
+            _periodEnd = value;
+            _rows = null;
+            _error = null;
+        }
+    }
+
+    // Normally you run month-end for a month that has finished
+    private static DateOnly DefaultPeriodEnd()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var endOfThisMonth = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+
+        return endOfThisMonth <= today.AddDays(1)
+            ? endOfThisMonth
+            : new DateOnly(today.Year, today.Month, 1).AddDays(-1);
+    }
+
+    private int Count(string outcome) => _rows?.Count(r => r.Outcome == outcome) ?? 0;
+
+    private decimal TotalPosted => _rows?.Where(r => r.Outcome == "Accrued").Sum(r => r.Amount) ?? 0m;
+
+    private List<int> FailedIds => _rows?.Where(r => r.Outcome == "Failed").Select(r => r.LoanId).ToList() ?? new();
+
+    private static string Label(string outcome) => outcome switch
+    {
+        "AlreadyAccrued" => "Already accrued",
+        "NothingToAccrue" => "Nothing to accrue",
+        _ => outcome
+    };
+
+    private static string BadgeClass(string outcome) => outcome switch
+    {
+        "Accrued" => "badge-active",
+        "Failed" => "badge-error",
+        _ => "badge-muted"
+    };
+
+    private async Task Run(IReadOnlyList<int>? only)
+    {
+        if (_running) return;
+
+        _running = true;
+        _error = null;
+        try
+        {
+            var result = await Api.RunMonthEndAccrualAsync(_periodEnd, only);
+
+            if (only is null || _rows is null)
+            {
+                _rows = result.Loans.ToList();
+            }
+            else
+            {
+                // A retry only covers some loans: update their rows and keep the rest
+                foreach (var updated in result.Loans)
+                {
+                    var i = _rows.FindIndex(r => r.LoanId == updated.LoanId);
+                    if (i >= 0) _rows[i] = updated;
+                }
+            }
+
+            _ranFor = _periodEnd;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;   // e.g. "A month-end run is already in progress..."
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

@@ -1,9 +1,11 @@
 ﻿using LedgerLite.Application.Accounts;
+using LedgerLite.Application.Batch;
 using LedgerLite.Application.Journal;
 using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
 using LedgerLite.Application.Savings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LedgerLite.Application;
 
@@ -31,6 +33,9 @@ public static class DependencyInjection
         services.AddScoped<RepayLoan>();
         services.AddScoped<GetLoanSummary>();
         services.AddScoped<ListLoans>();
+
+        services.AddScoped<RunMonthEndAccrual>();
+        services.TryAddSingleton(TimeProvider.System);
 
         return services;
     }

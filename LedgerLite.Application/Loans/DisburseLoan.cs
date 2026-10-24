@@ -61,11 +61,15 @@ public class DisburseLoan
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        var n = await _db.Loans.CountAsync(ct) + 1;
+        // Highest of both series, so the LN- and LI- numbers stay in step and never collide
+        var n = Math.Max(
+            await AccountCodes.NextNumberAsync(_db, "LN-", 6, ct),
+            await AccountCodes.NextNumberAsync(_db, "LI-", 6, ct));
+
         var principalAccount = await _createAccount.ExecuteAsync(new CreateAccountCommand(
-            $"LN-{n:D6}", $"Loan · {customer}", AccountType.Asset, portfolio.Id), ct);
+            AccountCodes.Format("LN-", 6, n), $"Loan · {customer}", AccountType.Asset, portfolio.Id), ct);
         var interestAccount = await _createAccount.ExecuteAsync(new CreateAccountCommand(
-            $"LI-{n:D6}", $"Loan interest · {customer}", AccountType.Asset, receivable.Id), ct);
+            AccountCodes.Format("LI-", 6, n), $"Loan interest · {customer}", AccountType.Asset, receivable.Id), ct);
 
         var loan = Loan.Create(customer, c.Principal, c.AnnualRatePercent, c.TermMonths,
             c.Date, principalAccount.Id, interestAccount.Id, key);

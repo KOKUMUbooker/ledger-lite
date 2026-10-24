@@ -85,6 +85,7 @@ else
                             <th class="num">Debits</th>
                             <th class="num">Credits</th>
                             <th class="num">Balance</th>
+                            <th class="num">With sub-accounts</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -99,6 +100,7 @@ else
                                     <td class="num">@Fmt.Money(rows.Sum(r => r.TotalDebits))</td>
                                     <td class="num">@Fmt.Money(rows.Sum(r => r.TotalCredits))</td>
                                     <td class="num">@Fmt.Money(rows.Sum(r => r.Balance))</td>
+                                    <td></td>
                                 </tr>
 
                                 @foreach (var row in rows)
@@ -114,6 +116,7 @@ else
                                             title="@(row.Balance < 0 ? "Unusual: this balance is on the opposite side to the account's normal balance." : null)">
                                             @Fmt.Money(row.Balance)
                                         </td>
+                                         <td class="num muted">@(row.HasChildren ? Fmt.Money(row.RolledUpBalance) : "")</td>
                                     </tr>
                                 }
                             }
@@ -124,6 +127,7 @@ else
                             <td colspan="2">Total</td>
                             <td class="num">@Fmt.Money(_data.GrandTotalDebits)</td>
                             <td class="num">@Fmt.Money(_data.GrandTotalCredits)</td>
+                            <td></td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -193,8 +197,8 @@ else
     private decimal TypeTotal(string type) =>
         _data is null ? 0m : _data.Rows.Where(r => r.Type == type).Sum(r => r.Balance);
 
-    private bool IsVisible(TrialBalanceRowDto row) =>
-        !_hideEmpty || row.TotalDebits != 0 || row.TotalCredits != 0;
+    private bool IsVisible(TrialBalanceRowDto r) =>
+        !_hideEmpty || r.TotalDebits != 0m || r.TotalCredits != 0m || r.RolledUpBalance != 0m;
 
     private bool AnyVisible => _data is not null && _data.Rows.Any(IsVisible);
 

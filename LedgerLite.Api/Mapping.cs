@@ -1,4 +1,5 @@
-﻿using LedgerLite.Application.Journal;
+﻿using LedgerLite.Application.Batch;
+using LedgerLite.Application.Journal;
 using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
 using LedgerLite.Contracts;
@@ -51,7 +52,7 @@ internal static class Mapping
     public static TrialBalanceDto ToDto(this TrialBalance t) => new(
         t.AsOf,
         t.Rows.Select(r => new TrialBalanceRowDto(
-            r.AccountId, r.Code, r.Name, r.Type.ToString(), r.TotalDebits, r.TotalCredits, r.Balance)).ToList(),
+            r.AccountId, r.Code, r.Name, r.Type.ToString(), r.TotalDebits, r.TotalCredits, r.Balance , r.HasChildren, r.RolledUpBalance )).ToList(),
         t.GrandTotalDebits,
         t.GrandTotalCredits,
         t.IsBalanced);
@@ -62,4 +63,12 @@ internal static class Mapping
 
     public static LoanSummaryDto ToDto(this LoanSummary s) => new(
         s.Loan.ToDto(), s.PrincipalOutstanding, s.InterestOutstanding, s.TotalOutstanding, s.IsSettled);
+
+    public static MonthEndResultDto ToDto(this MonthEndAccrualResult r) => new(
+        r.PeriodEnd,
+        r.Count(AccrualOutcome.Accrued), r.Count(AccrualOutcome.AlreadyAccrued),
+        r.Count(AccrualOutcome.NothingToAccrue), r.Count(AccrualOutcome.Failed),
+        r.TotalInterest,
+        r.Loans.Select(l => new LoanAccrualResultDto(
+            l.LoanId, l.CustomerName, l.Outcome.ToString(), l.Amount, l.Error)).ToList());
 }

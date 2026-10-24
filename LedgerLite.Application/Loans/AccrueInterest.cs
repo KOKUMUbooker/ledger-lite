@@ -1,4 +1,5 @@
-﻿using LedgerLite.Application.Exceptions;
+﻿using LedgerLite.Application.Common;
+using LedgerLite.Application.Exceptions;
 using LedgerLite.Application.Journal;   // adjust namespace
 using LedgerLite.Application.Savings;
 using LedgerLite.Data;
@@ -32,8 +33,8 @@ public class AccrueInterest
         // Interest is earned on what was outstanding at period end
         var principal = await LoanRules.BalanceAsync(_db, loan.PrincipalAccountId, c.PeriodEnd, ct);
 
-        // Simple monthly interest. Rounding policy is revisited in Stage 3.
-        var interest = Math.Round(principal * loan.AnnualRatePercent / 100m / 12m, 2, MidpointRounding.AwayFromZero);
+        // Rounding policy.
+        var interest = Rounding.MonthlyInterest(principal, loan.AnnualRatePercent);
         if (interest <= 0m) return null;
 
         var income = await SavingsRules.RequireByCodeAsync(_db, _codes.InterestIncome, ct);

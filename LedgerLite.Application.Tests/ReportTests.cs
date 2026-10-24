@@ -1,4 +1,5 @@
-﻿using LedgerLite.Application.Reports;
+﻿using LedgerLite.Application.Accounts;
+using LedgerLite.Application.Reports;
 using LedgerLite.Domain.Entities;
 
 namespace LedgerLite.Application.Tests;
@@ -97,5 +98,28 @@ public class ReportTests : LedgerTestBase
         Assert.Equal(6000m, late.Rows.Single(r => r.AccountId == cash.Id).Balance);
         Assert.True(early.IsBalanced);
         Assert.True(late.IsBalanced);
+    }
+
+    [Fact]
+    public async Task TrialBalance_ParentRollsUpItsChildren_WithoutChangingTheTotals()
+    {
+        var parent = await NewAccountAsync(AccountType.Liability);
+        var cash = await NewAccountAsync(AccountType.Asset);
+        Account child;
+        await using (var db = Fixture.CreateContext())
+        {
+            child = await new CreateAccount(db).ExecuteAsync(new CreateAccountCommand(
+                $"C{Guid.NewGuid():N}"[..14], "Child", AccountType.Liability, parent.Id));
+        }
+        await PostAsync(cash.Id, child.Id, 300m);
+
+        await using var read = Fixture.CreateContext();
+        var tb = await new GetTrialBalance(read).ExecuteAsync();
+
+        var row = tb.Rows.Single(r => r.AccountId == parent.Id);
+        Assert.True(row.HasChildren);
+        Assert.Equal(0m, row.Balance);             // own figure unchanged
+        Assert.Equal(300m, row.RolledUpBalance);   // with the child beneath it
+        Assert.Equal(tb.GrandTotalDebits, tb.GrandTotalCredits);
     }
 }

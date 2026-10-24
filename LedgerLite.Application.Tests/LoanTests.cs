@@ -247,4 +247,21 @@ public class LoanTests : LedgerTestBase
 
         await Assert.ThrowsAsync<LoanNotFoundException>(() => RepayAsync(s, int.MaxValue, 10m));
     }
+
+    [Fact]
+    public async Task ConcurrentRepayments_CannotOverpay()
+    {
+        var s = await SetupAsync();
+        var loan = (await DisburseAsync(s)).Loan;   // 10,000 owed
+
+        // Four repayments of 6,000 at once: only one fits
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, 4).Select(async _ =>
+        {
+            try { await RepayAsync(s, loan.Id, 6_000m); return true; }
+            catch (OverpaymentException) { return false; }
+        }));
+
+        Assert.Equal(1, outcomes.Count(ok => ok));
+        Assert.Equal(4_000m, (await SummaryAsync(loan.Id)).PrincipalOutstanding);
+    }
 }

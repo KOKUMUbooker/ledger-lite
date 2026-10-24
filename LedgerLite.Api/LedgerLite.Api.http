@@ -638,7 +638,60 @@ GET {{host}}/api/accounts/1/ledger?page=999
 ### Out-of-range paging is clamped (expect page 1, pageSize 200)
 GET {{host}}/api/accounts/1/ledger?page=0&pageSize=100000
 
-### ---------------- Savings (Owner only) ----------------
+### ================= Accounts: deactivate and activate (Owner) =================
+
+### Throwaway account to play with (change the code if it already exists: 409)
+# @name throwaway
+POST {{host}}/api/accounts
+Content-Type: application/json
+
+{ "code": "9100", "name": "Throwaway", "type": "Asset" }
+
+### Deactivate it: zero balance, no children (expect 200, isActive false)
+POST {{host}}/api/accounts/{{throwaway.response.body.$.id}}/deactivate
+
+### Post to it while inactive (expect 422 AccountInactive)
+POST {{host}}/api/journal-entries
+Content-Type: application/json
+
+{
+  "date": "2026-10-18",
+  "description": "Posting to an inactive account",
+  "reference": "INACTIVE-1",
+  "lines": [
+    { "accountId": 1, "debit": 10, "credit": 0 },
+    { "accountId": {{throwaway.response.body.$.id}}, "debit": 0, "credit": 10 }
+  ]
+}
+
+### Activate it again (expect 200, isActive true)
+POST {{host}}/api/accounts/{{throwaway.response.body.$.id}}/activate
+
+### Deactivate an account that has a balance (expect 422)
+# Run after some postings: Cash (1) has a balance.
+POST {{host}}/api/accounts/1/deactivate
+
+### Unknown account (expect 404)
+POST {{host}}/api/accounts/99999/deactivate
+
+### ================= Ledger paging =================
+
+### First page of 2 (totals and closing balance cover the whole period)
+GET {{host}}/api/accounts/1/ledger?page=1&pageSize=2
+
+### Second page: broughtForward carries the balance from page 1
+GET {{host}}/api/accounts/1/ledger?page=2&pageSize=2
+
+### Paged with a date range
+GET {{host}}/api/accounts/1/ledger?from=2026-10-01&page=1&pageSize=2
+
+### Page past the end (empty lines, totals still correct)
+GET {{host}}/api/accounts/1/ledger?page=999
+
+### Out-of-range paging is clamped (page 1, pageSize 200)
+GET {{host}}/api/accounts/1/ledger?page=0&pageSize=100000
+
+### ================= Savings (Owner) =================
 
 ### Open a savings account for a customer (expect 201)
 # @name openSavings
@@ -647,17 +700,17 @@ Content-Type: application/json
 
 { "customerName": "Jane Wanjiru" }
 
-### Deposit cash (expect 201; repeat the same Idempotency-Key and you get 200 with the same entry)
+### Deposit (expect 201; send it again for 200 with the same entry)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/deposit
 Content-Type: application/json
 
-{ "amount": 5000.00, "narration": "Opening deposit", Idempotency-Key: dep-jane-0001 }
+{ "amount": 5000.00, "narration": "Opening deposit", "idempotencyKey": "dep-jane-0001" }
 
-### Withdraw cash (expect 201)
+### Withdraw (expect 201)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw
 Content-Type: application/json
 
-{ "amount": 1200.00, Idempotency-Key: wdr-jane-0001 }
+{ "amount": 1200.00, "idempotencyKey": "wdr-jane-0001" }
 
 ### Withdraw more than the balance (expect 422 InsufficientFunds)
 POST {{host}}/api/savings/accounts/{{openSavings.response.body.$.id}}/withdraw
@@ -665,7 +718,7 @@ Content-Type: application/json
 
 { "amount": 999999.00 }
 
-### Deposit into a normal account, e.g. Cash (expect 422 NotASavingsAccount)
+### Deposit into an ordinary account (expect 422 NotASavingsAccount)
 POST {{host}}/api/savings/accounts/1/deposit
 Content-Type: application/json
 
@@ -677,30 +730,13 @@ Content-Type: application/json
 
 { "amount": -5 }
 
-### The customer's statement (running balance)
+### The customer's statement
 GET {{host}}/api/accounts/{{openSavings.response.body.$.id}}/ledger
 
-### ---------------- Loans (Owner only) ----------------
+### ================= Loans (Owner for writes) =================
 
-### One-time setup: the loan parent accounts, if your seed doesn't have them
-POST {{host}}/api/accounts
-Content-Type: application/json
-
-{ "code": "1200", "name": "Loan Portfolio", "type": "Asset" }
-
-###
-POST {{host}}/api/accounts
-Content-Type: application/json
-
-{ "code": "1210", "name": "Interest Receivable", "type": "Asset" }
-
-###
-POST {{host}}/api/accounts
-Content-Type: application/json
-
-{ "code": "4000", "name": "Interest Income", "type": "Income" }
-
-### Disburse 10,000 at 12% for 12 months (expect 201; resend the same idempotencyKey for 200)
+### Disburse 10,000 at 12% for 12 months (expect 201; same key again: 200)
+# Dated in September so the month-end request below stays valid on any day after it.
 # @name loan
 POST {{host}}/api/loans
 Content-Type: application/json
@@ -710,14 +746,21 @@ Content-Type: application/json
   "principal": 10000.00,
   "annualRatePercent": 12.00,
   "termMonths": 12,
+  "date": "2026-09-01",
   "idempotencyKey": "loan-jane-0001"
 }
 
-### Accrue October's interest (expect 201, amount 100.00; run again: 200, same entry)
+### Invalid terms (expect 422)
+POST {{host}}/api/loans
+Content-Type: application/json
+
+{ "customerName": "Bad Terms", "principal": 1000, "annualRatePercent": 150, "termMonths": 12 }
+
+### Accrue September's interest on one loan (expect 201, amount 100.00; again: 200)
 POST {{host}}/api/loans/{{loan.response.body.$.loan.id}}/accruals
 Content-Type: application/json
 
-{ "periodEnd": "2026-10-31" }
+{ "periodEnd": "2026-09-30" }
 
 ### Repay 150 (expect interestPaid 100, principalPaid 50)
 POST {{host}}/api/loans/{{loan.response.body.$.loan.id}}/repayments
@@ -731,13 +774,7 @@ Content-Type: application/json
 
 { "amount": 999999.00 }
 
-### Invalid terms (expect 422)
-POST {{host}}/api/loans
-Content-Type: application/json
-
-{ "customerName": "Bad Terms", "principal": 1000, "annualRatePercent": 150, "termMonths": 12 }
-
-### Loan summary (principalOutstanding, interestOutstanding, isSettled)
+### One loan: principal and interest outstanding, isSettled
 GET {{host}}/api/loans/{{loan.response.body.$.loan.id}}
 
 ### All loans
@@ -746,9 +783,48 @@ GET {{host}}/api/loans
 ### Unknown loan (expect 404)
 GET {{host}}/api/loans/99999
 
-### As a Visitor: reads work, writes return 403
+### ================= Month-end batch (Owner) =================
+
+### Accrue every loan for September (one result per loan; already-accrued ones are reported, not reposted)
+POST {{host}}/api/batch/month-end-accrual
+Content-Type: application/json
+
+{ "periodEnd": "2026-09-30" }
+
+### Run it again (expect every loan AlreadyAccrued, totalInterest 0)
+POST {{host}}/api/batch/month-end-accrual
+Content-Type: application/json
+
+{ "periodEnd": "2026-09-30" }
+
+### Retry just some loans, e.g. the ones that failed
+POST {{host}}/api/batch/month-end-accrual
+Content-Type: application/json
+
+{ "periodEnd": "2026-09-30", "loanIds": [1, 2] }
+
+### Far-future date (expect 422)
+POST {{host}}/api/batch/month-end-accrual
+Content-Type: application/json
+
+{ "periodEnd": "2062-10-31" }
+
+### ================= Reports: roll-up =================
+
+### Trial balance: parents now carry hasChildren and rolledUpBalance (own balance stays 0)
+GET {{host}}/api/reports/trial-balance
+
+### ================= Visitor (read-only): every write below returns 403 =================
 # First: GET {{host}}/api/auth/dev-login?role=visitor
-POST {{host}}/api/loans/1/repayments
+
+### Visitor tries a deposit (expect 403)
+POST {{host}}/api/savings/accounts/1/deposit
 Content-Type: application/json
 
 { "amount": 10 }
+
+### Visitor tries the batch (expect 403)
+POST {{host}}/api/batch/month-end-accrual
+Content-Type: application/json
+
+{ "periodEnd": "2026-09-30" }

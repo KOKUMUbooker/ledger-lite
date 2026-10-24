@@ -94,3 +94,9 @@ public class InvalidLoanOperationException : LedgerApplicationException
 {
     public InvalidLoanOperationException(string message) : base(message) { }
 }
+
+public class BatchAlreadyRunningException : LedgerApplicationException
+{
+    public BatchAlreadyRunningException()
+        : base("A month-end run is already in progress. Try again when it finishes.") { }
+}

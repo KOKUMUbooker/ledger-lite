@@ -1,5 +1,5 @@
 ﻿@page "/month-end"
-@attribute [Authorize(Roles = "Owner")]
+@* @attribute [Authorize(Roles = "Owner")] *@
 @inject LedgerApiClient Api
 
 <PageTitle>Month-end · LedgerLite</PageTitle>
@@ -19,12 +19,77 @@
     <input type="date" class="date-input" @bind="PeriodEnd" max="@MaxDate.ToString("yyyy-MM-dd")" />
 
     <div class="form-actions">
-        <BitButton Color="BitColor.Primary" IsLoading="_running" IsEnabled="@(PeriodEnd <= MaxDate)"
-                   OnClick="() => Run(null)">Run month-end</BitButton>
+        <BitButton Variant="BitVariant.Outline" IsLoading="_previewing"
+                   IsEnabled="@(PeriodEnd <= MaxDate && !_running)" OnClick="Preview">Preview</BitButton>
+
+        <AuthorizeView Roles="Owner">
+            <Authorized>
+                <BitButton Color="BitColor.Primary" IsLoading="_running"
+                           IsEnabled="@(PeriodEnd <= MaxDate && !_previewing)" OnClick="() => Run(null)">Run month-end</BitButton>
+            </Authorized>
+            <NotAuthorized>
+                <span class="muted">Running is limited to the owner. Preview shows exactly what it would do.</span>
+            </NotAuthorized>
+        </AuthorizeView>
     </div>
 </div>
 
 <ErrorBanner @bind-Message="_error" />
+
+@if (_preview is not null)
+{
+    <div class="preview-panel">
+        <h2 class="section-title">Preview for @_preview.PeriodEnd.ToString("MMMM yyyy"): nothing has been posted</h2>
+
+        @if (_preview.Loans.Count == 0)
+        {
+            <p class="muted">No loans were disbursed on or before that date.</p>
+        }
+        else
+        {
+            <p>
+                <strong>@_preview.WouldAccrue</strong> would accrue (<strong>@Fmt.Money(_preview.TotalInterest)</strong> in total),
+                @_preview.AlreadyAccrued already accrued,
+                @_preview.NothingToAccrue have nothing to accrue,
+                <strong>@_preview.WouldFail</strong> would fail.
+            </p>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Loan</th>
+                            <th>Customer</th>
+                            <th>Outcome</th>
+                            <th class="num">Principal at period end</th>
+                            <th class="num">Rate</th>
+                            <th class="num">Interest</th>
+                            <th class="num">Interest owed</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _preview.Loans)
+                        {
+                            <tr>
+                                <td><a href="/loans/@row.LoanId">#@row.LoanId</a></td>
+                                <td>@row.CustomerName</td>
+                                <td><span class="badge @PreviewBadge(row.Outcome)">@PreviewLabel(row.Outcome)</span></td>
+                                <td class="num">@(row.Outcome == "WouldFail" ? "-" : Fmt.Money(row.PrincipalAtPeriodEnd))</td>
+                                <td class="num">@row.AnnualRatePercent.ToString("0.##")%</td>
+                                <td class="num">@(row.Outcome is "WouldAccrue" or "AlreadyAccrued" ? Fmt.Money(row.Amount) : "-")</td>
+                                <td class="num">@Fmt.Money(row.InterestOutstandingBefore) → @Fmt.Money(row.InterestOutstandingAfter)</td>
+                                <td class="muted">@row.Error</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <p class="muted">Balances can change before you run it. Running posts exactly what a fresh preview would show.</p>
+    </div>
+}
 
 @if (_rows is not null)
 {
@@ -101,6 +166,8 @@
 }
 
 @code {
+    private MonthEndPreviewDto? _preview;
+    private bool _previewing;
     private List<LoanAccrualResultDto>? _rows;
     private DateOnly _periodEnd = DefaultPeriodEnd();
     private DateOnly _ranFor;
@@ -119,6 +186,7 @@
             if (_periodEnd == value) return;
             _periodEnd = value;
             _rows = null;
+            _preview = null;
             _error = null;
         }
     }
@@ -179,6 +247,7 @@
             }
 
             _ranFor = _periodEnd;
+            _preview = null;
         }
         catch (ApiException ex)
         {
@@ -189,4 +258,42 @@
             _running = false;
         }
     }
+
+    private async Task Preview()
+    {
+        if (_previewing || _running) return;
+
+        _previewing = true;
+        _error = null;
+        try
+        {
+            _preview = await Api.PreviewMonthEndAccrualAsync(_periodEnd);
+            _rows = null;   // a fresh preview replaces any earlier run results on screen
+        }
+        catch (ApiException ex)
+        {
+            _preview = null;
+            _error = ex.Message;
+        }
+        finally
+        {
+            _previewing = false;
+        }
+    }
+
+    private static string PreviewLabel(string outcome) => outcome switch
+    {
+        "WouldAccrue" => "Will accrue",
+        "AlreadyAccrued" => "Already accrued",
+        "NothingToAccrue" => "Nothing to accrue",
+        "WouldFail" => "Would fail",
+        _ => outcome
+    };
+
+    private static string PreviewBadge(string outcome) => outcome switch
+    {
+        "WouldAccrue" => "badge-active",
+        "WouldFail" => "badge-error",
+        _ => "badge-muted"
+    };
 }

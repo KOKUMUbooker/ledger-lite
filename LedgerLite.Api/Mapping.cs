@@ -78,4 +78,13 @@ internal static class Mapping
         r.TotalInterest,
         r.Loans.Select(l => new LoanAccrualResultDto(
             l.LoanId, l.CustomerName, l.Outcome.ToString(), l.Amount, l.Error)).ToList());
+
+    public static MonthEndPreviewDto ToDto(this MonthEndPreview p) => new(
+        p.PeriodEnd,
+        p.Count(AccrualPreviewOutcome.WouldAccrue), p.Count(AccrualPreviewOutcome.AlreadyAccrued),
+        p.Count(AccrualPreviewOutcome.NothingToAccrue), p.Count(AccrualPreviewOutcome.WouldFail),
+        p.TotalInterest,
+        p.Loans.Select(l => new LoanAccrualPreviewDto(
+            l.LoanId, l.CustomerName, l.Outcome.ToString(), l.PrincipalAtPeriodEnd, l.AnnualRatePercent,
+            l.Amount, l.InterestOutstandingBefore, l.InterestOutstandingAfter, l.Error)).ToList());
 }

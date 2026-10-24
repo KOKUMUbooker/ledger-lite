@@ -144,27 +144,29 @@ flowchart LR
 
 ## API overview
 
-| Method | Route                                                 | Notes                                                              |
-| ------ | ----------------------------------------------------- | ------------------------------------------------------------------ |
-| GET    | `/api/accounts?type=`                                 | List accounts                                                      |
-| POST   | `/api/accounts`                                       | Create an account (Owner)                                          |
-| GET    | `/api/accounts/{id}/ledger?from=&to=&page=&pageSize=` | Ledger with running balance                                        |
-| GET    | `/api/journal-entries?from=&to=&page=&pageSize=`      | Paged, newest first                                                |
-| POST   | `/api/journal-entries`                                | Post an entry (Owner). `201` new, `200` idempotent replay          |
-| GET    | `/api/journal-entries/{id}`                           | One entry, with `reversalOfEntryId` / `reversedByEntryId`          |
-| POST   | `/api/journal-entries/{id}/reverse`                   | Reverse an entry (Owner)                                           |
-| GET    | `/api/reports/trial-balance?asOf=`                    | Trial balance                                                      |
-| GET    | `/api/auth/login/{provider}`                          | Start Google or GitHub sign-in                                     |
-| GET    | `/api/auth/me`                                        | Current user and role                                              |
-| POST   | `/api/auth/logout`                                    | Sign out                                                           |
-| POST   | `/api/accounts/{id}/deactivate` and `/activate`       | Owner. Deactivate needs a zero balance and no active sub-accounts  |
-| POST   | `/api/savings/accounts`                               | Open a customer savings account (Owner)                            |
-| POST   | `/api/savings/accounts/{id}/deposit` and `/withdraw`  | Owner. Withdrawals can't overdraw. Idempotent via `idempotencyKey` |
-| GET    | `/api/loans`, `/api/loans/{id}`                       | Loans with principal and interest outstanding                      |
-| POST   | `/api/loans`                                          | Disburse a loan (Owner). Idempotent                                |
-| POST   | `/api/loans/{id}/repayments`                          | Repay, interest first (Owner). Returns the split                   |
-| POST   | `/api/loans/{id}/accruals`                            | Accrue one month's interest (Owner)                                |
-| POST   | `/api/batch/month-end-accrual`                        | Accrue every loan; optional `loanIds` to retry some (Owner)        |
+| Method | Route                                                 | Notes                                                                                             |
+| ------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| GET    | `/api/accounts?type=`                                 | List accounts                                                                                     |
+| POST   | `/api/accounts`                                       | Create an account (Owner)                                                                         |
+| GET    | `/api/accounts/{id}/ledger?from=&to=&page=&pageSize=` | Ledger with running balance                                                                       |
+| GET    | `/api/journal-entries?from=&to=&page=&pageSize=`      | Paged, newest first                                                                               |
+| POST   | `/api/journal-entries`                                | Post an entry (Owner). `201` new, `200` idempotent replay                                         |
+| GET    | `/api/journal-entries/{id}`                           | One entry, with `reversalOfEntryId` / `reversedByEntryId`                                         |
+| POST   | `/api/journal-entries/{id}/reverse`                   | Reverse an entry (Owner)                                                                          |
+| GET    | `/api/reports/trial-balance?asOf=`                    | Trial balance                                                                                     |
+| GET    | `/api/auth/login/{provider}`                          | Start Google or GitHub sign-in                                                                    |
+| GET    | `/api/auth/me`                                        | Current user and role                                                                             |
+| POST   | `/api/auth/logout`                                    | Sign out                                                                                          |
+| POST   | `/api/accounts/{id}/deactivate` and `/activate`       | Owner. Deactivate needs a zero balance and no active sub-accounts                                 |
+| POST   | `/api/savings/accounts`                               | Open a customer savings account (Owner)                                                           |
+| POST   | `/api/savings/accounts/{id}/deposit` and `/withdraw`  | Owner. Withdrawals can't overdraw. Idempotent via `idempotencyKey`                                |
+| GET    | `/api/loans`, `/api/loans/{id}`                       | Loans with principal and interest outstanding                                                     |
+| POST   | `/api/loans`                                          | Disburse a loan (Owner). Idempotent                                                               |
+| POST   | `/api/loans/{id}/repayments`                          | Repay, interest first (Owner). Returns the split                                                  |
+| POST   | `/api/loans/{id}/accruals`                            | Accrue one month's interest (Owner)                                                               |
+| POST   | `/api/batch/month-end-accrual`                        | Accrue every loan; optional `loanIds` to retry some (Owner)                                       |
+| POST   | `/api/journal-entries/preview`                        | Dry run: runs every check and shows balances before and after, saves nothing (any signed-in user) |
+| POST   | `/api/batch/month-end-accrual/preview`                | Dry run of the month-end: per-loan outcome and amounts, posts nothing (any signed-in user)        |
 
 A ready-made request collection covering every endpoint, including the failure cases, is in
 [`LedgerLite.Api/requests.http`](LedgerLite.Api/requests.http).
@@ -187,6 +189,6 @@ A ready-made request collection covering every endpoint, including the failure c
 ## Roadmap
 
 - [x] **Stage 1: the ledger engine.** Accounts, balanced entries, reversals, idempotency, ledgers, trial balance, web UI, sign-in, rate limiting
-- [ ] **Stage 2: savings and loans.** Posting rules for deposits, withdrawals, loan disbursement and repayment (principal/interest split), interest accrual, suspense accounts
-- [ ] **Stage 3: batch processing.** End-of-day runs and rounding rules
-- [ ] **Deployment.** Cloudflare, reverse proxy, firewall, VPS hosting under a custom domain
+- [x] **Stage 2: savings and loans.** Posting rules for deposits, withdrawals, loan disbursement and repayment (principal/interest split), interest accrual, suspense accounts
+- [x] **Stage 3: batch processing.** End-of-day runs and rounding rules
+- [ ] **Deployment.**

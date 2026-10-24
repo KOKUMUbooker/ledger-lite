@@ -172,4 +172,84 @@ public class BatchTests : LedgerTestBase
 
         Assert.Empty(result.Loans);
     }
+
+    private async Task<MonthEndPreview> PreviewMonthEndAsync(Setup s, DateOnly periodEnd, params int[] loanIds)
+    {
+        await using var db = Fixture.CreateContext();
+        var accrue = new AccrueInterest(db, new PostJournalEntry(db), s.Codes);
+        return await new PreviewMonthEndAccrual(accrue, db, Clock)
+            .ExecuteAsync(new MonthEndAccrualCommand(periodEnd, loanIds));
+    }
+
+    private static AccrualPreviewOutcome ExpectedPreview(AccrualOutcome o) => o switch
+    {
+        AccrualOutcome.Accrued => AccrualPreviewOutcome.WouldAccrue,
+        AccrualOutcome.AlreadyAccrued => AccrualPreviewOutcome.AlreadyAccrued,
+        AccrualOutcome.NothingToAccrue => AccrualPreviewOutcome.NothingToAccrue,
+        _ => AccrualPreviewOutcome.WouldFail
+    };
+
+    [Fact]
+    public async Task Preview_ShowsWhatEachLoanWouldAccrue_AndPostsNothing()
+    {
+        var s = await SetupAsync();
+        var a = await DisburseAsync(s, 10_000m);
+        var b = await DisburseAsync(s, 5_000m);
+
+        var preview = await PreviewMonthEndAsync(s, Oct31, a.Id, b.Id);
+
+        Assert.Equal(2, preview.Count(AccrualPreviewOutcome.WouldAccrue));
+        Assert.Equal(150m, preview.TotalInterest);
+
+        var rowA = preview.Loans.Single(l => l.LoanId == a.Id);
+        Assert.Equal(10_000m, rowA.PrincipalAtPeriodEnd);
+        Assert.Equal(12m, rowA.AnnualRatePercent);
+        Assert.Equal(100m, rowA.Amount);
+        Assert.Equal(0m, rowA.InterestOutstandingBefore);
+        Assert.Equal(100m, rowA.InterestOutstandingAfter);
+
+        // Nothing was posted
+        Assert.Equal(0m, await InterestOwedAsync(a.Id));
+        Assert.Equal(0m, await InterestOwedAsync(b.Id));
+    }
+
+    [Fact]
+    public async Task Preview_AgreesWithTheRealRun_LoanByLoan()
+    {
+        var s = await SetupAsync();
+        var broken = await DisburseAsync(s, 10_000m);
+        var healthy = await DisburseAsync(s, 5_000m);
+        var settled = await DisburseAsync(s, 1_000m);
+        await RepayAsync(s, settled.Id, 1_000m, new DateOnly(2026, 10, 15));
+
+        await using (var db = Fixture.CreateContext())
+            await new SetAccountActive(db).ExecuteAsync(new SetAccountActiveCommand(broken.InterestAccountId, false));
+
+        var ids = new[] { broken.Id, healthy.Id, settled.Id };
+
+        var preview = await PreviewMonthEndAsync(s, Oct31, ids);
+        var run = await Runner(s).ExecuteAsync(new MonthEndAccrualCommand(Oct31, ids));
+
+        Assert.Equal(run.Loans.Count, preview.Loans.Count);
+        foreach (var p in preview.Loans)
+        {
+            var r = run.Loans.Single(x => x.LoanId == p.LoanId);
+            Assert.Equal(ExpectedPreview(r.Outcome), p.Outcome);
+            Assert.Equal(r.Amount, p.Amount);
+            Assert.Equal(r.Error, p.Error);   // the same failure message, not just the same verdict
+        }
+
+        // After the run, a second preview must say the healthy loan is already done
+        var again = await PreviewMonthEndAsync(s, Oct31, ids);
+        Assert.Equal(AccrualPreviewOutcome.AlreadyAccrued, again.Loans.Single(l => l.LoanId == healthy.Id).Outcome);
+    }
+
+    [Fact]
+    public async Task Preview_RejectsAFuturePeriodEnd_LikeTheRun()
+    {
+        var s = await SetupAsync();
+
+        await Assert.ThrowsAsync<InvalidLoanOperationException>(() =>
+            PreviewMonthEndAsync(s, new DateOnly(2026, 12, 31)));
+    }
 }

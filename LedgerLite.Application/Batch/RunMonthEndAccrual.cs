@@ -1,6 +1,7 @@
 ﻿using LedgerLite.Application.Exceptions;
 using LedgerLite.Application.Loans;
 using LedgerLite.Data;
+using LedgerLite.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,16 +40,19 @@ public class RunMonthEndAccrual
     public async Task<MonthEndAccrualResult> ExecuteAsync(MonthEndAccrualCommand c, CancellationToken ct = default)
     {
         // Catches typos like 2062-10-31 before they accrue interest into the future
-        var today = DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
-        if (c.PeriodEnd > today.AddDays(1))
-            throw new InvalidLoanOperationException("Period end cannot be in the future.");
+        MonthEndRules.ValidatePeriodEnd(_clock, c.PeriodEnd);
 
         if (!await Gate.WaitAsync(0, ct))
             throw new BatchAlreadyRunningException();
 
         try
         {
-            var loans = await ListEligibleLoansAsync(c, ct);
+            List<Loan> loans;
+            await using (var scope = _scopes.CreateAsyncScope())
+            {
+                loans = await MonthEndRules.ListLoansAsync(
+                    scope.ServiceProvider.GetRequiredService<LedgerDbContext>(), c, ct);
+            }
             var results = new List<LoanAccrualResult>(loans.Count);
 
             foreach (var loan in loans)
@@ -65,24 +69,9 @@ public class RunMonthEndAccrual
         }
     }
 
-    private record Candidate(int Id, string CustomerName, int InterestAccountId);
-
-    private async Task<List<Candidate>> ListEligibleLoansAsync(MonthEndAccrualCommand c, CancellationToken ct)
-    {
-        await using var scope = _scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
-
-        var query = db.Loans.AsNoTracking().Where(l => l.DisbursedOn <= c.PeriodEnd);
-        if (c.LoanIds is { Count: > 0 } ids) query = query.Where(l => ids.Contains(l.Id));
-
-        return await query.OrderBy(l => l.Id)
-            .Select(l => new Candidate(l.Id, l.CustomerName, l.InterestAccountId))
-            .ToListAsync(ct);
-    }
-
     // Each loan gets its own scope, and so its own DbContext: a failure can leave a half-added entry
     // tracked in a context, and that must never leak into the next loan.
-    private async Task<LoanAccrualResult> AccrueOneAsync(Candidate loan, DateOnly periodEnd, CancellationToken ct)
+    private async Task<LoanAccrualResult> AccrueOneAsync(Loan loan, DateOnly periodEnd, CancellationToken ct)
     {
         try
         {

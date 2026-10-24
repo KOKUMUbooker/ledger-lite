@@ -52,7 +52,7 @@ internal static class Mapping
     public static TrialBalanceDto ToDto(this TrialBalance t) => new(
         t.AsOf,
         t.Rows.Select(r => new TrialBalanceRowDto(
-            r.AccountId, r.Code, r.Name, r.Type.ToString(), r.TotalDebits, r.TotalCredits, r.Balance)).ToList(),
+            r.AccountId, r.Code, r.Name, r.Type.ToString(), r.TotalDebits, r.TotalCredits, r.Balance , r.HasChildren, r.RolledUpBalance )).ToList(),
         t.GrandTotalDebits,
         t.GrandTotalCredits,
         t.IsBalanced);

@@ -6,7 +6,8 @@ namespace LedgerLite.Application.Reports;
 
 public record TrialBalanceRow(
     int AccountId, string Code, string Name, AccountType Type,
-    decimal TotalDebits, decimal TotalCredits, decimal Balance);
+    decimal TotalDebits, decimal TotalCredits, decimal Balance,
+    bool HasChildren, decimal RolledUpBalance);
 
 public record TrialBalance(
     DateOnly? AsOf,
@@ -47,14 +48,25 @@ public class GetTrialBalance
 
         var accounts = await _db.Accounts.AsNoTracking().OrderBy(a => a.Code).ToListAsync(ct);
 
-        var rows = accounts.Select(a =>
+        // Each account's own figures first...
+        var owned = accounts.ToDictionary(a => a.Id, a =>
         {
             totals.TryGetValue(a.Id, out var t);
             var debits = t?.Debits ?? 0m;
             var credits = t?.Credits ?? 0m;
-            return new TrialBalanceRow(a.Id, a.Code, a.Name, a.Type, debits, credits,
-                a.BalanceFrom(debits, credits));
-        }).ToList();
+            return (Debits: debits, Credits: credits, Balance: a.BalanceFrom(debits, credits));
+        });
+
+        // ...then each parent's figure including everything beneath it
+        // (children share their parent's type, so their signed balances add up correctly)
+        var children = accounts.Where(a => a.ParentAccountId != null).ToLookup(a => a.ParentAccountId!.Value);
+
+        decimal RolledUp(int id) => owned[id].Balance + children[id].Sum(c => RolledUp(c.Id));
+
+        var rows = accounts.Select(a => new TrialBalanceRow(
+            a.Id, a.Code, a.Name, a.Type,
+            owned[a.Id].Debits, owned[a.Id].Credits, owned[a.Id].Balance,
+            children[a.Id].Any(), RolledUp(a.Id))).ToList();
 
         return new TrialBalance(asOf, rows, rows.Sum(r => r.TotalDebits), rows.Sum(r => r.TotalCredits));
     }

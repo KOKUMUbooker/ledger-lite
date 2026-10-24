@@ -101,6 +101,12 @@ public class LedgerApiClient
         (await SendAsync<AccrualDto>(
             HttpMethod.Post, $"api/loans/{loanId}/accruals", new AccrueInterestRequest(periodEnd), ct)).Value;
 
+    // ---- Batching ----
+    public async Task<MonthEndResultDto> RunMonthEndAccrualAsync(
+        DateOnly periodEnd, IReadOnlyList<int>? loanIds = null, CancellationToken ct = default) =>
+        (await SendAsync<MonthEndResultDto>(
+            HttpMethod.Post, "api/batch/month-end-accrual", new MonthEndRequest(periodEnd, loanIds), ct)).Value;
+
     // ---- Plumbing ----
 
     private record ApiResponse<T>(T Value, HttpStatusCode Status);

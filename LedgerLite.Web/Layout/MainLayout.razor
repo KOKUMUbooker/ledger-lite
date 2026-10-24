@@ -7,9 +7,9 @@
         <button type="button" class="nav-toggle" aria-label="Toggle navigation" @onclick="ToggleNav">☰</button>
         <span class="app-title">LEDGER-LITE</span>
         <UserMenu />
-        <AuthorizeView Roles="Owner">
+        @* <AuthorizeView Roles="Owner"> *@
             <BitButton IconName="Add" OnClick="NewEntry">New entry</BitButton>
-        </AuthorizeView>
+        @* </AuthorizeView> *@
     </header>
 
     <aside class="app-nav">

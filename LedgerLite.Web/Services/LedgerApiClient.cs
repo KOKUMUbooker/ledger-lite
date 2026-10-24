@@ -65,6 +65,11 @@ public class LedgerApiClient
         int id, ReverseEntryRequest request, CancellationToken ct = default) =>
         (await SendAsync<JournalEntryDto>(HttpMethod.Post, $"api/journal-entries/{id}/reverse", request, ct)).Value;
 
+    public async Task<JournalEntryPreviewDto> PreviewEntryAsync(PostEntryRequest request, CancellationToken ct = default) =>
+        (await SendAsync<JournalEntryPreviewDto>(
+            HttpMethod.Post, "api/journal-entries/preview", request, ct)).Value;
+
+    // ---- Savings ----
     public async Task<AccountDto> OpenSavingsAccountAsync(string customerName, CancellationToken ct = default) =>
     (await SendAsync<AccountDto>(
         HttpMethod.Post, "api/savings/accounts", new OpenSavingsAccountRequest(customerName), ct)).Value;

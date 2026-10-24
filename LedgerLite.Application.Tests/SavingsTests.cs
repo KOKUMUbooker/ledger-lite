@@ -166,4 +166,21 @@ public class SavingsTests : LedgerTestBase
         Assert.Equal(0m, await BalanceOfAsync(s.Cash.Id));
         Assert.Equal(0m, await BalanceOfAsync(s.Savings.Id));
     }
+
+    [Fact]
+    public async Task ConcurrentWithdrawals_CannotOverdraw()
+    {
+        var s = await SetupAsync();
+        await DepositAsync(s, 500m);
+
+        // Four withdrawals of 400 at once against a balance of 500: exactly one may succeed
+        var outcomes = await Task.WhenAll(Enumerable.Range(0, 4).Select(async _ =>
+        {
+            try { await WithdrawAsync(s, 400m); return true; }
+            catch (InsufficientFundsException) { return false; }
+        }));
+
+        Assert.Equal(1, outcomes.Count(ok => ok));
+        Assert.Equal(100m, await BalanceOfAsync(s.Savings.Id));
+    }
 }

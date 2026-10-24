@@ -1,4 +1,5 @@
-﻿using LedgerLite.Application.Exceptions;
+﻿using LedgerLite.Application.Common;
+using LedgerLite.Application.Exceptions;
 using LedgerLite.Application.Journal;   
 using LedgerLite.Application.Savings;
 using LedgerLite.Data;
@@ -35,21 +36,23 @@ public class RepayLoan
 
         var cash = await SavingsRules.RequireByCodeAsync(_db, _codes.Cash, ct);
 
+        // Lock first, then read the balances: two simultaneous repayments can't both fit under the same balance
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await RowLock.AccountAsync(_db, loan.PrincipalAccountId, ct);
+
         var principalOutstanding = await LoanRules.BalanceAsync(_db, loan.PrincipalAccountId, null, ct);
         var interestOutstanding = await LoanRules.BalanceAsync(_db, loan.InterestAccountId, null, ct);
 
-        // A replayed request must return the original, even if the loan is now fully repaid
         var key = string.IsNullOrWhiteSpace(c.IdempotencyKey) ? null : c.IdempotencyKey.Trim();
         var isReplay = key is not null && await _db.JournalEntries.AnyAsync(e => e.IdempotencyKey == key, ct);
 
         if (!isReplay && c.Amount > principalOutstanding + interestOutstanding)
             throw new OverpaymentException(principalOutstanding + interestOutstanding, c.Amount);
 
-        // Interest first, then principal
         var interestPart = Math.Min(c.Amount, Math.Max(interestOutstanding, 0m));
         var principalPart = c.Amount - interestPart;
 
-        var lines = new List<PostLine> { new(cash.Id, c.Amount, 0m) };   // Dr Cash
+        var lines = new List<PostLine> { new(cash.Id, c.Amount, 0m) };
         if (interestPart > 0m) lines.Add(new PostLine(loan.InterestAccountId, 0m, interestPart));
         if (principalPart > 0m) lines.Add(new PostLine(loan.PrincipalAccountId, 0m, principalPart));
 
@@ -61,10 +64,10 @@ public class RepayLoan
             key,
             EntrySource.LoanRepayment), ct);
 
-        // Read the split back from the entry, so a replay reports what was actually posted
+        await tx.CommitAsync(ct);
+
         var interestPaid = posted.Entry.Lines.Where(l => l.AccountId == loan.InterestAccountId).Sum(l => l.Credit);
         var principalPaid = posted.Entry.Lines.Where(l => l.AccountId == loan.PrincipalAccountId).Sum(l => l.Credit);
-
         return new RepayLoanResult(posted.Entry, posted.WasDuplicate, interestPaid, principalPaid);
     }
 }

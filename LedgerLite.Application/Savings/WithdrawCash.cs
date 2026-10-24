@@ -1,4 +1,5 @@
-﻿using LedgerLite.Application.Exceptions;
+﻿using LedgerLite.Application.Common;
+using LedgerLite.Application.Exceptions;
 using LedgerLite.Application.Journal;   // adjust to the namespace of PostJournalEntry
 using LedgerLite.Data;
 using LedgerLite.Domain.Entities;
@@ -24,8 +25,11 @@ public class WithdrawCash
         SavingsRules.ValidateAmount(c.Amount);
         var (savings, cash) = await SavingsRules.LoadAsync(_db, _codes, c.SavingsAccountId, ct);
 
-        // A replayed request must return the original entry, even though the balance has since dropped.
-        // So the funds check only applies to a request we haven't seen before.
+        // From here on we hold a lock on the customer's account row, so two simultaneous
+        // withdrawals are checked one after the other and can never both pass on the same balance.
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await RowLock.AccountAsync(_db, savings.Id, ct);
+
         var isReplay = c.IdempotencyKey is not null &&
                        await _db.JournalEntries.AnyAsync(e => e.IdempotencyKey == c.IdempotencyKey, ct);
 
@@ -33,20 +37,22 @@ public class WithdrawCash
         {
             var balance = await SavingsRules.BalanceAsync(_db, savings, ct);
             if (balance < c.Amount)
-                throw new InsufficientFundsException(savings.Code, balance, c.Amount);
+                throw new InsufficientFundsException(savings.Code, balance, c.Amount);   // tx disposed: rolls back
         }
 
-        // Dr Customer savings (we owe less), Cr Cash (asset down)
-        return await _post.ExecuteAsync(new PostJournalEntryCommand(
+        var posted = await _post.ExecuteAsync(new PostJournalEntryCommand(
             c.Date,
             string.IsNullOrWhiteSpace(c.Narration) ? $"Cash withdrawal · {savings.Name}" : c.Narration.Trim(),
             $"WDR-{Guid.NewGuid():N}"[..16],
             new[]
             {
-                new PostLine(savings.Id, c.Amount, 0m),
-                new PostLine(cash.Id, 0m, c.Amount)
+            new PostLine(savings.Id, c.Amount, 0m),
+            new PostLine(cash.Id, 0m, c.Amount)
             },
             c.IdempotencyKey,
             EntrySource.WithdrawCash), ct);
+
+        await tx.CommitAsync(ct);
+        return posted;
     }
 }

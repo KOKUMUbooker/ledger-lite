@@ -1232,3 +1232,7 @@ code {
     padding: 2px 0;
     font-variant-numeric: tabular-nums;
 }
+
+.badge-error {
+    background: rgba(200, 0, 0, 0.14);
+}

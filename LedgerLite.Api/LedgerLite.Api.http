@@ -858,3 +858,9 @@ Content-Type: application/json
     { "accountId": 3, "debit": 0, "credit": 90.00 }
   ]
 }
+
+### Preview month-end: what each loan WOULD accrue, nothing is posted (Owner or Visitor)
+POST {{host}}/api/batch/month-end-accrual/preview
+Content-Type: application/json
+
+{ "periodEnd": "2026-09-30" }

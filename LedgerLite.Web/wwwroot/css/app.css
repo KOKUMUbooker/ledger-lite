@@ -724,6 +724,18 @@ code {
     }
 }
 
+.preview-panel {
+    margin: 16px 0;
+    padding: 16px;
+    border: 1px dashed var(--bit-clr-brd-pri, #c8c6c4);
+    border-radius: 8px;
+}
+
+.bal-neg {
+    color: #b45309;
+    font-weight: 600;
+}
+
 /* ---- Entry detail and reverse dialog ---- */
 .detail-grid {
     display: grid;

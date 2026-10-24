@@ -38,6 +38,13 @@ internal static class Mapping
         s.Id, s.Date, AsUtc(s.PostedAt), s.Description, s.Reference, s.Source.ToString(),
         s.ReversalOfEntryId, s.ReversedByEntryId, s.Total, s.LineCount);
 
+    public static JournalEntryPreviewDto ToDto(this JournalEntryPreview p) => new(
+        p.Date, p.Description, p.Reference,
+        p.Lines.Select(l => new PreviewLineDto(
+            l.AccountId, l.Code, l.Name, l.Type.ToString(), NormalBalanceOf(l.Type),
+            l.Debit, l.Credit, l.BalanceBefore, l.BalanceAfter)).ToList(),
+        p.TotalDebits, p.TotalCredits, p.WouldReplayEntryId, p.Warnings);
+
     public static AccountLedgerDto ToDto(this AccountLedger l) => new(
         l.AccountId, l.Code, l.Name, l.Type.ToString(), NormalBalanceOf(l.Type),
         l.From, l.To,

@@ -1,7 +1,7 @@
 ﻿@page "/journal/new"
 @using System.Globalization
 @inject LedgerApiClient Api
-@attribute [Authorize(Roles = "Owner")]
+@* @attribute [Authorize(Roles = "Owner")] *@
 
 <PageTitle>New entry · LedgerLite</PageTitle>
 
@@ -121,10 +121,84 @@ else if (_accountsLoaded)
         <p class="muted">New to debits and credits? <a href="/how-it-works">See how it works</a>.</p>
     </ul>
 
-    <div class="form-actions">
-        <BitButton Variant="BitVariant.Outline" IsEnabled="!_saving" OnClick="ClearForm">Clear</BitButton>
-        <BitButton Color="BitColor.Primary" IsEnabled="CanPost" IsLoading="_saving" OnClick="Post">Post entry</BitButton>
-    </div>
+    <AuthorizeView Roles="Owner">
+        <Authorized>
+            <div class="form-actions">
+                <BitButton Variant="BitVariant.Outline" IsEnabled="!_saving && !_previewing" OnClick="ClearForm">Clear</BitButton>
+                <BitButton Variant="BitVariant.Outline" IsEnabled="CanPreview" IsLoading="_previewing" OnClick="Preview">Preview</BitButton>
+                <BitButton Color="BitColor.Primary" IsEnabled="CanPost" IsLoading="_saving" OnClick="Post">Post entry</BitButton>
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <p class="muted">
+                Posting is limited to the owner. <strong>Preview</strong> runs the real checks and shows exactly what
+                would happen, without saving anything.
+            </p>
+            <div class="form-actions">
+                <BitButton Variant="BitVariant.Outline" IsEnabled="!_previewing" OnClick="ClearForm">Clear</BitButton>
+                <BitButton Color="BitColor.Primary" IsEnabled="CanPreview" IsLoading="_previewing" OnClick="Preview">Preview</BitButton>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    @if (PreviewIsCurrent)
+    {
+        <div class="preview-panel">
+            <h2 class="section-title">Preview: what posting would do</h2>
+
+            @if (_preview!.WouldReplayEntryId is not null)
+            {
+                <BitMessage Color="BitColor.Info">
+                    An entry with this idempotency key already exists
+                    (<a href="/journal/@_preview.WouldReplayEntryId">#@_preview.WouldReplayEntryId</a>),
+                    so posting would return it and add nothing new.
+                </BitMessage>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th class="num">Debit</th>
+                                <th class="num">Credit</th>
+                                <th class="num">Balance before</th>
+                                <th class="num">Balance after</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in _preview.Lines)
+                            {
+                                <tr>
+                                    <td>@line.Code · @line.Name</td>
+                                    <td class="num">@Fmt.MoneyOrBlank(line.Debit)</td>
+                                    <td class="num">@Fmt.MoneyOrBlank(line.Credit)</td>
+                                    <td class="num">@Fmt.Money(line.BalanceBefore)</td>
+                                    <td class="num @(line.BalanceAfter < 0 ? "bal-neg" : "")">@Fmt.Money(line.BalanceAfter)</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="group-row">
+                                <td>Totals</td>
+                                <td class="num">@Fmt.Money(_preview.TotalDebits)</td>
+                                <td class="num">@Fmt.Money(_preview.TotalCredits)</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                @foreach (var warning in _preview.Warnings)
+                {
+                    <BitMessage Color="BitColor.Warning">@warning</BitMessage>
+                }
+            }
+
+            <p class="muted">Nothing has been saved. Balances can change before you post.</p>
+        </div>
+    }
 }
 
 @code {
@@ -154,6 +228,10 @@ else if (_accountsLoaded)
     private bool _loading = true;
     private bool _accountsLoaded;
     private bool _saving;
+
+    private JournalEntryPreviewDto? _preview;
+    private string? _previewSignature;
+    private bool _previewing;
 
     // Retrying the same entry (for example after a network timeout) reuses one key, so it can only post once.
     // Changing the content gets a fresh key.
@@ -201,6 +279,7 @@ else if (_accountsLoaded)
 
     private void ClearForm()
     {
+        _preview = null;
         ResetForm(keepDate: false);
         _error = null;
         _postedId = null;
@@ -306,6 +385,53 @@ else if (_accountsLoaded)
         return $"{(increases ? "↑" : "↓")} {account.Name} {(increases ? "increases" : "decreases")}";
     }
 
+    // Previewing only needs a complete form. It doesn't need a balanced one: the server's refusal of an
+    // unbalanced entry is one of the things worth seeing.
+    private bool CanPreview => HasHeader && LinesValid && !_saving && !_previewing;
+
+    // A preview describes the form as it was. Edit anything and it disappears rather than mislead.
+    private bool PreviewIsCurrent =>
+        _preview is not null && HasHeader && Signature(BuildRequest()) == _previewSignature;
+
+    private PostEntryRequest BuildRequest()
+    {
+        var lines = _lines
+            .Where(l => !l.IsEmpty)
+            .Select(l => new PostLineRequest(l.AccountId!.Value, AmountOf(l.Debit), AmountOf(l.Credit)))
+            .ToList();
+
+        return new PostEntryRequest(
+            DateOnly.FromDateTime(_date!.Value.Date),
+            _description!.Trim(),
+            _reference!.Trim(),
+            lines);
+    }
+
+    private async Task Preview()
+    {
+        if (!CanPreview) return;
+
+        _error = null;
+        _postedId = null;
+
+        var request = BuildRequest();
+        _previewing = true;
+        try
+        {
+            _preview = await Api.PreviewEntryAsync(request);
+            _previewSignature = Signature(request);
+        }
+        catch (ApiException ex)
+        {
+            _preview = null;
+            _error = ex.Message;   // the same message posting would give, e.g. "Debits (100.00) must equal credits (90.00)"
+        }
+        finally
+        {
+            _previewing = false;
+        }
+    }
+
     // Pre-fills the form from the "How it works" page. Quietly does nothing if an example account is missing.
     private void ApplyExample()
     {
@@ -349,17 +475,9 @@ else if (_accountsLoaded)
 
         _error = null;
         _postedId = null;
+        _preview = null;
 
-        var lines = _lines
-            .Where(l => !l.IsEmpty)
-            .Select(l => new PostLineRequest(l.AccountId!.Value, AmountOf(l.Debit), AmountOf(l.Credit)))
-            .ToList();
-
-        var request = new PostEntryRequest(
-            DateOnly.FromDateTime(_date!.Value.Date),
-            _description!.Trim(),
-            _reference!.Trim(),
-            lines);
+        var request = BuildRequest();
 
         var signature = Signature(request);
         if (signature != _lastSignature)

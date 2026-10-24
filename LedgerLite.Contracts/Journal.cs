@@ -39,3 +39,15 @@ public record JournalEntrySummaryDto(
     int LineCount);
 
 public record PagedResultDto<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
+
+// ------------- For previews ------------------
+public record PreviewLineDto(
+    int AccountId, string Code, string Name, string Type, string NormalBalance,
+    decimal Debit, decimal Credit, decimal BalanceBefore, decimal BalanceAfter);
+
+public record JournalEntryPreviewDto(
+    DateOnly Date, string Description, string Reference,
+    IReadOnlyList<PreviewLineDto> Lines,
+    decimal TotalDebits, decimal TotalCredits,
+    int? WouldReplayEntryId,
+    IReadOnlyList<string> Warnings);

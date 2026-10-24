@@ -828,3 +828,33 @@ POST {{host}}/api/batch/month-end-accrual
 Content-Type: application/json
 
 { "periodEnd": "2026-09-30" }
+
+
+### ================= Preview post journal entries =================
+### Preview an entry: same body as posting, nothing is saved (works for Owner and Visitor)
+POST {{host}}/api/journal-entries/preview
+Content-Type: application/json
+
+{
+  "date": "2026-10-20",
+  "description": "Cash deposit - Jane Wanjiru",
+  "reference": "PREVIEW-1",
+  "lines": [
+    { "accountId": 1, "debit": 5000.00, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 5000.00 }
+  ]
+}
+
+### Preview an unbalanced entry (expect 400 or 422, the same error posting gives)
+POST {{host}}/api/journal-entries/preview
+Content-Type: application/json
+
+{
+  "date": "2026-10-20",
+  "description": "Unbalanced",
+  "reference": "PREVIEW-2",
+  "lines": [
+    { "accountId": 1, "debit": 100.00, "credit": 0 },
+    { "accountId": 3, "debit": 0, "credit": 90.00 }
+  ]
+}

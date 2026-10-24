@@ -34,9 +34,10 @@ public class OpenSavingsAccount
 
         for (var attempt = 0; ; attempt++)
         {
-            var code = await NextCodeAsync(ct);
             try
             {
+                var number = await AccountCodes.NextNumberAsync(_db, "SAV-", 6, ct);
+                var code = AccountCodes.Format("SAV-", 6, number);
                 return await _createAccount.ExecuteAsync(
                     new CreateAccountCommand(code, $"Savings · {customer}", AccountType.Liability, parent.Id), ct);
             }
@@ -46,18 +47,4 @@ public class OpenSavingsAccount
             }
         }
     }
-
-    // Codes are unique across ALL accounts, so numbering must be global, not per parent.
-    // They are zero-padded, so the highest string is also the highest number.
-    private async Task<string> NextCodeAsync(CancellationToken ct)
-    {
-        var last = await _db.Accounts.AsNoTracking()
-            .Where(a => a.Code.StartsWith(Prefix) && a.Code.Length == Prefix.Length + Digits)
-            .OrderByDescending(a => a.Code)
-            .Select(a => a.Code)
-            .FirstOrDefaultAsync(ct);
-
-        var next = last is not null && int.TryParse(last.AsSpan(Prefix.Length), out var n) ? n + 1 : 1;
-        return $"{Prefix}{next.ToString($"D{Digits}")}";
-    }
-}
+ }

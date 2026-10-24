@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddScoped<PreviewJournalEntry>();
+        services.AddScoped<PreviewMonthEndAccrual>();
 
         return services;
     }

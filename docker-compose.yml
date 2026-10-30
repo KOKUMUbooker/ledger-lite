@@ -1,0 +1,40 @@
+name: ledgerlite
+
+services:
+  api:
+    build: .
+    image: ledgerlite-api:latest
+    restart: unless-stopped
+    env_file: .env                         # includes ConnectionStrings__LedgerDb, OAuth secrets, Auth__Owners__N
+    environment:
+      Database__MigrateOnStartup: "true"
+      # nginx reaches the container through this address (see the fixed subnet below)
+      Proxy__KnownProxies__0: "172.28.0.1"
+    ports:
+      - "127.0.0.1:${LEDGERLITE_PORT:-8081}:8080"   # loopback only: nginx is the only way in
+    volumes:
+      - ledgerlite-keys:/keys
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8080
+          printf 'GET /healthz HTTP/1.0\r\n\r\n' >&3
+          head -n1 <&3 | grep -q 200
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s                    # the first start also runs migrations over the internet
+    networks: [internal]
+
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
+
+volumes:
+  ledgerlite-keys:

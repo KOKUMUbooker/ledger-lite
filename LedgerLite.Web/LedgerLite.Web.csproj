@@ -14,8 +14,7 @@
 	  <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.13" />
       <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
 	  <PackageReference Include="Bit.BlazorUI.Icons" Version="10.6.2" />
-	  <!-- This is optional since now the API serves the client -->
-      <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.13" PrivateAssets="all" />
+	  <!-- In case you ever want to run client separately, ensure to install Microsoft.AspNetCore.Components.WebAssembly.DevServer -->
   </ItemGroup>
 
   <ItemGroup>

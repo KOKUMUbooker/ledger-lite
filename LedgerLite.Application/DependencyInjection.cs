@@ -1,5 +1,6 @@
 ﻿using LedgerLite.Application.Accounts;
 using LedgerLite.Application.Batch;
+using LedgerLite.Application.Demo;
 using LedgerLite.Application.Journal;
 using LedgerLite.Application.Loans;
 using LedgerLite.Application.Reports;
@@ -39,6 +40,8 @@ public static class DependencyInjection
 
         services.AddScoped<PreviewJournalEntry>();
         services.AddScoped<PreviewMonthEndAccrual>();
+
+        services.AddScoped<DemoDataSeeder>();
 
         return services;
     }

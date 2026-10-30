@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/*.Tests/
+.git/
+.github/
+.vs/
+.vscode/
+docs/
+*.md
+
+# secrets never go into an image
+.env
+.env.*

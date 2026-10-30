@@ -1,5 +1,6 @@
 using LedgerLite.Api.Auth;
 using LedgerLite.Api.ErrorHandling;
+using LedgerLite.Api.Maintenance;
 using LedgerLite.Api.Proxy;
 using LedgerLite.Api.RateLimiting;
 using LedgerLite.Application;
@@ -9,7 +10,8 @@ namespace LedgerLite.Api;
 
 public class Program
 {
-    public static void Main(string[] args)
+    //public static void Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         // Load .env, searching upward from the working directory, BEFORE the builder reads configuration.
         // NoClobber: variables already set in the real environment (on the server, say) win over the file.
@@ -35,6 +37,7 @@ public class Program
         builder.Services.AddLedgerAuth(builder.Configuration, builder.Environment);
         builder.Services.AddLedgerForwardedHeaders(builder.Configuration);
         builder.Services.AddLedgerRateLimiting(builder.Configuration);
+        builder.Services.AddHealthChecks();
 
         // Guard against oversized request bodies
         builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 64 * 1024);
@@ -65,12 +68,20 @@ public class Program
 
         app.MapControllers();
 
+        app.MapHealthChecks("/healthz");
+
         // Unknown /api/... URLs must stay a real 404, not fall through to index.html
         app.Map("/api/{**path}", () => Results.NotFound());
 
         // Any other URL (e.g. /accounts/5/ledger) belongs to the Blazor router
         app.MapFallbackToFile("index.html");
 
-        app.Run();
+        // reset-db / seed-demo run and exit instead of starting the web server
+        var exitCode = await MaintenanceCommands.TryRunAsync(app, args);
+        if (exitCode is not null) return exitCode.Value;
+
+        await app.RunAsync();
+
+        return 0;
     }
 }

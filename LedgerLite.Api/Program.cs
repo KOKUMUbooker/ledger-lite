@@ -58,8 +58,7 @@ public class Program
         app.UseHttpsRedirection();
 
         // Serve the Blazor WASM client (_framework files, then wwwroot and static web assets such as Bit's)
-        app.UseBlazorFrameworkFiles();
-        app.UseStaticFiles();
+        app.MapStaticAssets().ShortCircuit(); // Also short circuit requests for file requests
 
         app.UseAuthentication();
         app.UseAuthorization();

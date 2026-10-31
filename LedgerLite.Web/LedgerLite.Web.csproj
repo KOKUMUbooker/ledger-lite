@@ -6,6 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
 	<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+	<StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+
+	<PublishTrimmed>true</PublishTrimmed>
+	<TrimMode>partial</TrimMode>
+
+	<InvariantGlobalization>true</InvariantGlobalization>
+	<BlazorEnableTimeZoneSupport>false</BlazorEnableTimeZoneSupport>
   </PropertyGroup>
 
   <ItemGroup>

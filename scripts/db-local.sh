@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Local SQL Server in Docker, for running LedgerLite on a Linux machine.
+# The SA password lives in .env as MSSQL_SA_PASSWORD (generated on first run).
 #
 # Usage:
-#   scripts/db-local.sh up [--write-env]   start (creates the password on first run); --write-env updates .env
+#   scripts/db-local.sh up [--write-env]   start; --write-env sets ConnectionStrings__LedgerDb in .env
 #   scripts/db-local.sh status             container state
 #   scripts/db-local.sh conn               print the connection strings
 #   scripts/db-local.sh stop               stop, keep the data
@@ -10,30 +11,35 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE=(docker compose -f docker-compose.db.yml --env-file .env.db)
-SECRETS=.env.db        # holds the generated SA password; gitignored
+# Compose reads .env in this directory by itself for ${MSSQL_SA_PASSWORD} etc.
+COMPOSE=(docker compose -f docker-compose.db.yml)
 DB_NAME=LedgerLite
 
 command -v docker >/dev/null || { echo "Docker is not installed." >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required." >&2; exit 1; }
 
+# Read one variable from .env without executing the file (it holds secrets and semicolons)
+env_get() { grep -m1 "^$1=" .env 2>/dev/null | cut -d= -f2- || true; }
+
 ensure_secrets() {
-  if [ ! -f "$SECRETS" ]; then
-    # Alphanumeric plus a fixed suffix: meets SQL Server's complexity rules and needs no escaping
-    local pw; pw="Ll1-$(openssl rand -hex 12)"
-    umask 077
-    printf 'MSSQL_SA_PASSWORD=%s\nMSSQL_PORT=1433\n' "$pw" > "$SECRETS"
-    echo "Created $SECRETS with a generated SA password."
+  [ -f .env ] || cp .env.example .env
+  if [ -z "$(env_get MSSQL_SA_PASSWORD)" ]; then
+    # Alphanumeric plus a fixed prefix: meets SQL Server's complexity rules, needs no escaping
+    printf '\nMSSQL_SA_PASSWORD=Ll1-%s\n' "$(openssl rand -hex 12)" >> .env
+    echo "Added a generated MSSQL_SA_PASSWORD to .env"
   fi
-  set -a; . "./$SECRETS"; set +a
+  MSSQL_SA_PASSWORD=$(env_get MSSQL_SA_PASSWORD)
+  MSSQL_PORT=$(env_get MSSQL_PORT)
+  MSSQL_PORT=${MSSQL_PORT:-1433}
+  export MSSQL_SA_PASSWORD MSSQL_PORT
 }
 
 conn_string() {
-  echo "Server=localhost,${MSSQL_PORT:-1433};Database=${DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
+  echo "Server=localhost,${MSSQL_PORT};Database=${DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True"
 }
 
 test_conn_string() {   # the tests create and drop their own uniquely named databases
-  echo "Server=localhost,${MSSQL_PORT:-1433};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+  echo "Server=localhost,${MSSQL_PORT};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
 }
 
 print_conn() {
@@ -46,7 +52,6 @@ print_conn() {
 }
 
 write_env() {
-  [ -f .env ] || cp .env.example .env
   local line; line="ConnectionStrings__LedgerDb=$(conn_string)"
   if grep -q '^ConnectionStrings__LedgerDb=' .env; then
     # '|' as the sed delimiter: the generated password never contains it
@@ -62,6 +67,7 @@ case "${1:-}" in
     ensure_secrets
     "${COMPOSE[@]}" up -d
     echo -n "Waiting for SQL Server to accept connections"
+    state=starting
     for _ in $(seq 1 60); do
       state=$(docker inspect -f '{{.State.Health.Status}}' ledgerlite-sqlserver 2>/dev/null || echo starting)
       [ "$state" = healthy ] && break
@@ -73,8 +79,8 @@ case "${1:-}" in
       echo "(It needs about 2 GB of free RAM.)" >&2
       exit 1
     fi
-    echo "SQL Server is ready on 127.0.0.1:${MSSQL_PORT:-1433}"
-    [ "${2:-}" = "--write-env" ] && write_env
+    echo "SQL Server is ready on 127.0.0.1:${MSSQL_PORT}"
+    if [ "${2:-}" = "--write-env" ]; then write_env; fi
     print_conn
     echo
     echo "Next:  dotnet ef database update -p LedgerLite.Data -s LedgerLite.Api"

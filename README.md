@@ -10,9 +10,7 @@ LedgerLite records financial events as balanced journal entries, derives every b
 mistakes with reversals instead of edits. It is a portfolio project: the data is fictional, no real money is
 involved.
 
-<!-- Add after deployment:
-**Live demo:** https://your-domain
--->
+**Live demo:** https://ledgerlite.bkokumu.com
 
 ## What it does
 

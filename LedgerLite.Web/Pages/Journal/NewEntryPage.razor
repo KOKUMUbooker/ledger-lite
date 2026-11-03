@@ -240,8 +240,9 @@ else if (_accountsLoaded)
 
     protected override async Task OnInitializedAsync()
     {
-        ResetForm(keepDate: false);              // 1. start from a blank form
+        ResetForm(keepDate: false);
 
+        var exampleApplied = false;
         try
         {
             var all = await Api.ListAccountsAsync();
@@ -252,7 +253,7 @@ else if (_accountsLoaded)
                 .ToList();
             _accountsLoaded = true;
 
-            ApplyExample();                      // 2. only now do the account IDs exist
+            exampleApplied = ApplyExample();
         }
         catch (ApiException ex)
         {
@@ -261,6 +262,12 @@ else if (_accountsLoaded)
         finally
         {
             _loading = false;
+        }
+
+        if (exampleApplied)
+        {
+            StateHasChanged();      // show the pre-filled form straight away
+            await Preview();        // then fill in the preview panel when the server answers
         }
     }
 
@@ -433,8 +440,9 @@ else if (_accountsLoaded)
         }
     }
 
-    // Pre-fills the form from the "How it works" page. Quietly does nothing if an example account is missing.
-    private void ApplyExample()
+    // Pre-fills the form from the "How it works" page. Returns false (and changes nothing)
+    // if there is no example in the URL or an example account is missing.
+    private bool ApplyExample()
     {
         int? IdOf(string code) => _accounts.FirstOrDefault(a => a.Code == code)?.Id;
 
@@ -453,7 +461,7 @@ else if (_accountsLoaded)
                 new LineModel { AccountId = cash, Debit = "5000.00" },
                 new LineModel { AccountId = deposits, Credit = "5000.00" }
             };
-                break;
+                return true;
 
             case "repayment" when cash is not null && loans is not null && interest is not null:
                 _reference = "EXAMPLE-REPAYMENT";
@@ -464,7 +472,10 @@ else if (_accountsLoaded)
                 new LineModel { AccountId = loans, Credit = "1000.00" },
                 new LineModel { AccountId = interest, Credit = "100.00" }
             };
-                break;
+                return true;
+
+            default:
+                return false;
         }
     }
 

@@ -240,8 +240,7 @@ else if (_accountsLoaded)
 
     protected override async Task OnInitializedAsync()
     {
-        ApplyExample();
-        ResetForm(keepDate: false);
+        ResetForm(keepDate: false);              // 1. start from a blank form
 
         try
         {
@@ -252,6 +251,8 @@ else if (_accountsLoaded)
                 .Select(a => new BitDropdownItem<int?> { Text = $"{a.Code} · {a.Name}", Value = a.Id })
                 .ToList();
             _accountsLoaded = true;
+
+            ApplyExample();                      // 2. only now do the account IDs exist
         }
         catch (ApiException ex)
         {

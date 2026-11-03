@@ -30,13 +30,14 @@ involved.
 - **Month-end batch**: accrues interest for every loan, safe to re-run, and one failing loan never stops the rest. Results are shown per loan, with a retry for the failures
 
 ## Screenshots
-|  |  |
-|---|---|
-| **Dashboard.** The accounting equation, live from the ledger<br>![Dashboard](docs/images/dashboard.png) | **Posting with a preview.** See exactly what would happen before saving<br>![New entry preview](docs/images/new-entry-preview.png) |
-| **Loan detail.** Interest is repaid before principal<br>![Loan detail](docs/images/loan-detail.png) | **Month-end accrual.** A dry run before the batch<br>![Month-end preview](docs/images/month-end-preview.png) |
-| **Account ledger.** Running balance, derived from the entries<br>![Account ledger](docs/images/account-ledger.png) | **Trial balance.** Totals match, so the books balance<br>![Trial balance](docs/images/trial-balance.png) |
-| **The mistake.** 90,000 keyed instead of 9,000<br>![Original entry](docs/images/journal-original.png) | **The correction.** Every debit and credit flipped, nothing edited or deleted<br>![Reversal entry](docs/images/journal-reversal.png) |
-| **Savings.** Customer accounts, each with a statement<br>![Savings](docs/images/savings.png) | |
+
+|                                                                                                                    |                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Dashboard.** The accounting equation, live from the ledger<br>![Dashboard](docs/images/dashboard.png)            | **Posting with a preview.** See exactly what would happen before saving<br>![New entry preview](docs/images/new-entry-preview.png)   |
+| **Loan detail.** Interest is repaid before principal<br>![Loan detail](docs/images/loan-detail.png)                | **Month-end accrual.** A dry run before the batch<br>![Month-end preview](docs/images/month-end-preview.png)                         |
+| **Account ledger.** Running balance, derived from the entries<br>![Account ledger](docs/images/account-ledger.png) | **Trial balance.** Totals match, so the books balance<br>![Trial balance](docs/images/trial-balance.png)                             |
+| **The mistake.** 90,000 keyed instead of 9,000<br>![Original entry](docs/images/journal-original.png)              | **The correction.** Every debit and credit flipped, nothing edited or deleted<br>![Reversal entry](docs/images/journal-reversal.png) |
+| **Savings.** Customer accounts, each with a statement<br>![Savings](docs/images/savings.png)                       |                                                                                                                                      |
 
 ## Quick start
 
@@ -90,6 +91,55 @@ always win over the file, which is what you want on a server.
 
 See [`.env.example`](.env.example) for the full annotated list, including the OAuth callback URLs to register
 (`/signin-google` and `/signin-github`).
+
+## Resetting and demo data
+
+A seeder fills an empty database with five months of believable history: 8 customers with savings accounts,
+deposits and withdrawals, four loans (one repaid early, one that stopped paying), interest credits, a keying
+mistake that is reversed and corrected, and month-end accruals run through the real batch. It uses the same
+use cases as the app, so every rule is exercised and the books balance.
+
+|                                       | PowerShell                     | Bash                           |
+| ------------------------------------- | ------------------------------ | ------------------------------ |
+| Wipe, rebuild and load demo data      | `./scripts/reset-db.ps1 -Seed` | `./scripts/reset-db.sh --seed` |
+| Wipe and rebuild only                 | `./scripts/reset-db.ps1`       | `./scripts/reset-db.sh`        |
+| Load demo data into an empty database | `./scripts/seed-demo.ps1`      | `./scripts/seed-demo.sh`       |
+
+The scripts wrap two commands built into the Api, which run and exit instead of starting the web server:
+
+```bash
+dotnet run --project LedgerLite.Api -- reset-db --yes seed-demo
+```
+
+- **`reset-db`** drops every table and re-applies the migrations (which recreate the starter chart of
+  accounts). It works on hosts where you can't drop the database itself. The scripts print the target server and
+  database first and ask you to type `RESET`. Running it directly requires `--yes`.
+- **`seed-demo`** refuses to run if the database already has entries or loans, so it can't pile data on top of
+  itself.
+- In the **Production** environment, `reset-db` also needs `--production`, so a stray command can't wipe a live
+  database by accident.
+- Dates are relative to the day you seed, so the history always ends today. Re-seed every so often to keep a
+  public demo looking current.
+
+### Local database on Linux (Docker)
+
+On Windows the default connection string uses LocalDB. On Linux, `scripts/db-local.sh` runs SQL Server in Docker
+(it needs about 2 GB of free RAM):
+
+```bash
+scripts/db-local.sh up --write-env     # starts SQL Server, generates a password, updates .env
+scripts/reset-db.sh --seed             # create the schema and demo data
+dotnet run --project LedgerLite.Api
+```
+
+Other commands: `status`, `conn` (prints the connection strings, including the one for the tests), `stop`, and
+`destroy` (deletes the data volume). The database is bound to `127.0.0.1` only.
+
+### On a server
+
+With the app running in Docker, `scripts/db.sh reset | seed | fresh` runs the same commands through
+`docker compose run`. Stop the app first (`docker compose stop api`) on a small server so the extra process
+doesn't compete for memory.
 
 ## Running the tests
 

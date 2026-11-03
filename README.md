@@ -30,13 +30,13 @@ involved.
 - **Month-end batch**: accrues interest for every loan, safe to re-run, and one failing loan never stops the rest. Results are shown per loan, with a retry for the failures
 
 ## Screenshots
-
-|                                                                                                                    |                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| **Dashboard.** The accounting equation, live from the ledger<br>![Dashboard](docs/images/dashboard.png)            | **Posting with a preview.** See exactly what would happen before saving<br>![New entry preview](docs/images/new-entry-preview.png)   |
-| **Loan detail.** Interest is repaid before principal<br>![Loan detail](docs/images/loan-detail.png)                | **Month-end accrual.** A dry run before the batch<br>![Month-end preview](docs/images/month-end-preview.png)                         |
-| **Account ledger.** Running balance, derived from the entries<br>![Account ledger](docs/images/account-ledger.png) | **Trial balance.** Totals match, so the books balance<br>![Trial balance](docs/images/trial-balance.png)                             |
-| **The mistake.** 90,000 keyed instead of 9,000<br>![Original entry](docs/images/journal-original.png)              | **The correction.** Every debit and credit flipped, nothing edited or deleted<br>![Reversal entry](docs/images/journal-reversal.png) | **Savings.** Customer accounts, each with a statement<br>![Savings](docs/images/savings.png) |
+|  |  |
+|---|---|
+| **Dashboard.** The accounting equation, live from the ledger<br>![Dashboard](docs/images/dashboard.png) | **Posting with a preview.** See exactly what would happen before saving<br>![New entry preview](docs/images/new-entry-preview.png) |
+| **Loan detail.** Interest is repaid before principal<br>![Loan detail](docs/images/loan-detail.png) | **Month-end accrual.** A dry run before the batch<br>![Month-end preview](docs/images/month-end-preview.png) |
+| **Account ledger.** Running balance, derived from the entries<br>![Account ledger](docs/images/account-ledger.png) | **Trial balance.** Totals match, so the books balance<br>![Trial balance](docs/images/trial-balance.png) |
+| **The mistake.** 90,000 keyed instead of 9,000<br>![Original entry](docs/images/journal-original.png) | **The correction.** Every debit and credit flipped, nothing edited or deleted<br>![Reversal entry](docs/images/journal-reversal.png) |
+| **Savings.** Customer accounts, each with a statement<br>![Savings](docs/images/savings.png) | |
 
 ## Quick start
 

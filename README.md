@@ -243,4 +243,4 @@ A ready-made request collection covering every endpoint, including the failure c
 - [x] **Stage 1: the ledger engine.** Accounts, balanced entries, reversals, idempotency, ledgers, trial balance, web UI, sign-in, rate limiting
 - [x] **Stage 2: savings and loans.** Posting rules for deposits, withdrawals, loan disbursement and repayment (principal/interest split), interest accrual, suspense accounts
 - [x] **Stage 3: batch processing.** End-of-day runs and rounding rules
-- [ ] **Deployment.**
+- [x] **Deployment.**

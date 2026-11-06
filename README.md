@@ -221,7 +221,7 @@ flowchart LR
 | POST   | `/api/batch/month-end-accrual/preview`                | Dry run of the month-end: per-loan outcome and amounts, posts nothing (any signed-in user)        |
 
 A ready-made request collection covering every endpoint, including the failure cases, is in
-[`LedgerLite.Api/requests.http`](LedgerLite.Api/requests.http).
+[`LedgerLite.Api/LedgerLite.Api.http`](LedgerLite.Api/LedgerLite.Api.http).
 
 ## Access, security and hardening
 
